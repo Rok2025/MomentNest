@@ -5,3 +5,53 @@ body{background-image:radial-gradient(#bcc9b21a .7px,transparent .7px);backgroun
 .recovery-flow h1,.auth-complete h1{margin:14px 0}.auth-result-icon{display:flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:50%;background:var(--soft);color:var(--green);font-size:30px;margin:22px 0 16px}.recovery-address{padding:12px 16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);font-weight:600;overflow-wrap:anywhere}.recovery-steps{padding-left:22px;font-size:14px}.recovery-steps li{padding:5px 0}.recovery-flow .form-stack button{width:100%}.recovery-back{display:block;text-align:center;margin-top:22px}.recovery-help{font-size:13px}.recovery-flow .notice,.auth-error{font-size:14px}.auth-error{padding:12px 16px;border:1px solid #e2c9bb;border-radius:12px;background:#fff5ef;color:#984429}.auth-complete .button{width:100%;margin-top:16px}.recovery-flow h1:focus{outline:none}
 
 .memory .card-top + .cover-link{margin-top:18px}
+
+/* Everyday home: memories first, date exploration on demand. */
+.home-intro{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px 0 20px}
+.home-title{display:flex;align-items:center;flex-wrap:wrap;gap:10px 16px}
+.home-title h1{font:30px Georgia,'Songti SC',serif;line-height:1.35;margin:0}
+.home-intro p{margin:7px 0 0;font-size:14px;color:var(--muted)}
+.home-intro>.button{flex-shrink:0}
+.journal-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.journal-total{margin:0;font-weight:550;white-space:nowrap}
+.journal-total>span{margin-left:12px;font-size:12px;font-weight:400;color:var(--muted)}
+.journal-filters{display:flex;align-items:center;gap:10px}
+.journal-filters select,.journal-filters button{font-size:13px;min-height:44px}
+.calendar-toggle{gap:10px}
+.calendar-toggle[aria-expanded=true]{background:var(--soft);border-color:#b3c3a6}
+.calendar-panel[hidden]{display:none}
+.calendar-panel>.heatmap{margin-top:16px;padding:20px 24px}
+.calendar-panel .eyebrow{display:none}
+.calendar-panel .heatmap h2{font-size:21px;margin:0 0 14px}
+.calendar-panel .heat-controls{padding-top:14px}
+.heat-controls select{min-height:44px}
+.heat-options{font-size:13px;color:var(--muted);margin-top:12px}
+.heat-options summary{cursor:pointer;padding:8px 0;width:fit-content}
+.heat-options .zoom-label{margin:10px 0 0}
+.journal-range{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:12px;font-size:13px;color:var(--muted)}
+.journal-range button{font-size:12px;min-height:36px;padding:5px 10px}
+.journal-feed .chapter{font-size:26px;letter-spacing:1px;margin:12px 0 20px;padding:12px}
+.journal-feed .chapter small{display:inline;font-size:12px;margin:0 10px 0 0;letter-spacing:1px}
+.journal-feed .journal-empty{margin:16px auto 32px;padding:36px 24px}
+.journal-empty .empty-mark{font-size:30px}
+.journal-empty h2{margin-top:12px}
+.journal-feed .pager:empty{display:none}
+@media(max-width:650px){
+ .home-intro{align-items:flex-start;gap:14px;padding:20px 0}
+ .home-title{display:block}
+ .home-title h1{font-size:24px}
+ .home-title .age{font-size:10px;margin-top:8px}
+ .home-intro p{font-size:12px;max-width:200px}
+ .home-intro>.button{font-size:13px;padding:9px 12px;white-space:nowrap}
+ .journal-toolbar{flex-wrap:wrap;gap:10px;padding:12px 0}
+ .journal-total{font-size:14px}
+ .journal-total>span{font-size:11px}
+ .journal-filters{width:100%;justify-content:space-between;gap:8px}
+ .journal-filters select{flex:1;min-width:0}
+ .journal-filters button{flex-shrink:0}
+ .calendar-panel>.heatmap{padding:18px 14px}
+ .calendar-panel .heat-controls{gap:8px}
+ .journal-feed .chapter{text-align:left;font-size:24px;margin:10px 0 14px;padding:10px 0 10px 30px}
+ .journal-feed .journal-empty{margin:8px auto 24px;padding:28px 20px}
+ .journal-range{align-items:flex-start;flex-wrap:wrap}
+}
