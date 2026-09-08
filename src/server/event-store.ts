@@ -2,6 +2,7 @@ import { lockUploads,bindUploads } from './media-store';
 import { createHash } from 'node:crypto';
 import { DomainError, inputSchema, type EventRecord, type Member } from '../domain/events';
 import { validEventDate, todayShanghai } from '../domain/dates';
+import type { DayCount } from '../domain/heatmap';
 export interface Queryable { query(text: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }> }
 export type Transaction = <T>(fn: (db: Queryable) => Promise<T>) => Promise<T>;
 export async function memberFor(db: Queryable, authId: string): Promise<Member> {
@@ -23,6 +24,9 @@ export async function getEvent(db: Queryable, authId: string, id: string): Promi
 export type Cursor = { date: string; createdAt: string; id: string };
 export async function listEvents(db: Queryable, authId: string, cursor?: Cursor, range?: {start:string;end:string}) {
   const m = await memberFor(db,authId);
+  return listForMember(db,m,cursor,range);
+}
+async function listForMember(db: Queryable, m: Member, cursor?: Cursor, range?: {start:string;end:string}) {
   const values: unknown[] = [m.householdId];
   let after = '';
   if(cursor) { after=' and (e.occurred_on,e.created_at,e.id)<($2::date,$3::timestamptz,$4::uuid)'; values.push(cursor.date,cursor.createdAt,cursor.id); }
@@ -30,6 +34,24 @@ export async function listEvents(db: Queryable, authId: string, cursor?: Cursor,
   const { rows }=await db.query(`${selection} where e.household_id=$1${after} order by e.occurred_on desc,e.created_at desc,e.id desc limit 21`,values);
   const items=rows.slice(0,20).map(record),last=items.at(-1);
   return { items, next: rows.length>20 && last ? { date:last.occurredOn,createdAt:last.createdAt,id:last.id } : null };
+}
+export async function heatmapCounts(db:Queryable,authId:string){
+  return countsForMember(db,await memberFor(db,authId));
+}
+async function countsForMember(db:Queryable,m:Member):Promise<DayCount[]>{
+  const {rows}=await db.query('select occurred_on::text as date,count(*)::int as count from momentnest.events where household_id=$1 group by occurred_on order by occurred_on',[m.householdId]);
+  return rows.map(r=>({date:String(r.date),count:Number(r.count)}));
+}
+// Share one live membership check only within this read, never across requests.
+export async function homeData(db:Queryable,authId:string,range?:{start:string;end:string},pages=1){
+  const member=await memberFor(db,authId);
+  const [first,days]=await Promise.all([listForMember(db,member,undefined,range),countsForMember(db,member)]);
+  let page=first;
+  for(let i=1;i<Math.min(50,pages)&&page.next;i++){
+    const next=await listForMember(db,member,page.next,range);
+    page={items:[...page.items,...next.items],next:next.next};
+  }
+  return {member,page,days};
 }
 export async function saveEvent(transaction: Transaction, authId: string, raw: unknown, today=todayShanghai()): Promise<string> {
   // Shape validation first; replay a known successful operation before checking a moving 'today'.

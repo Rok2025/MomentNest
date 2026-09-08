@@ -2,7 +2,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { beforeAll,afterAll,describe,it,expect } from 'vitest';
-import { saveEvent,getEvent,listEvents,memberFor,type Transaction } from '../src/server/event-store';
+import { saveEvent,getEvent,listEvents,memberFor,homeData,heatmapCounts,type Transaction } from '../src/server/event-store';
 const h='10000000-0000-4000-8000-000000000001',father='20000000-0000-4000-8000-000000000001',mother='20000000-0000-4000-8000-000000000002',other='20000000-0000-4000-8000-000000000003';
 let db:PGlite;
 const tx:Transaction=fn=>db.transaction(t=>fn(t));
@@ -28,4 +28,39 @@ describe('真实PostgreSQL引擎中的迁移与事件事务（隔离测试，不
  it('非公开schema、运行角色无删除/成员写入/DDL，但允许保存',async()=>{const result=await db.query("select has_schema_privilege('anon','momentnest','usage') as anon,has_table_privilege('momentnest_app','momentnest.events','delete') as del,has_table_privilege('momentnest_app','momentnest.members','update') as member_update,has_schema_privilege('momentnest_app','momentnest','create') as ddl");expect(result.rows[0]).toEqual({anon:false,del:false,member_update:false,ddl:false});await db.exec('set role momentnest_app');try{await saveEvent(tx,father,input());}finally{await db.exec('reset role');}});
  it('仅爸爸启用时可以独立保存，无需妈妈账号',async()=>{await db.query('update momentnest.members set active=false where auth_user_id=$1',[mother]);try{const id=await saveEvent(tx,father,input());expect((await getEvent(db,father,id)).author).toBe('爸爸');}finally{await db.query('update momentnest.members set active=true where auth_user_id=$1',[mother]);}});
  it('数据库本身禁止更改作者和创建时间',async()=>{const id=await saveEvent(tx,father,input());await expect(db.query("update momentnest.events set created_at=created_at+interval '1 day',version=version+1 where id=$1",[id])).rejects.toThrow('immutable event identity');});
+ it('首页合并读取与原分页/热力图一致，只查询一次成员',async()=>{
+  const queries:string[]=[];
+  const counted={query:async(sql:string,values?:unknown[])=>{queries.push(sql);return db.query<Record<string,unknown>>(sql,values);}};
+  const range={start:'2025-04-17',end:'2025-04-17'};
+  const data=await homeData(counted,father,range,2);
+  const first=await listEvents(db,father,undefined,range),second=await listEvents(db,father,first.next!,range);
+  expect(data.page).toEqual({items:[...first.items,...second.items],next:second.next});
+  expect(data.days).toEqual(await heatmapCounts(db,father));
+  expect(data.member.label).toBe('爸爸');
+  expect(queries.filter(sql=>sql.includes('auth_user_id=$1'))).toHaveLength(1);
+  expect(queries).toHaveLength(4);
+ });
+ it('首页不会跨请求缓存权限，停用成员后立即拒绝且不读取回忆',async()=>{
+  await homeData(db,mother);
+  await db.query('update momentnest.members set active=false where auth_user_id=$1',[mother]);
+  const queries:string[]=[];
+  const counted={query:async(sql:string,values?:unknown[])=>{queries.push(sql);return db.query<Record<string,unknown>>(sql,values);}};
+  try{
+   await expect(homeData(counted,mother)).rejects.toMatchObject({code:'FORBIDDEN'});
+   expect(queries).toHaveLength(1);
+   await expect(homeData(db,other)).rejects.toMatchObject({code:'FORBIDDEN'});
+  }finally{await db.query('update momentnest.members set active=true where auth_user_id=$1',[mother]);}
+ });
+ it('首页数据与热力图都按家庭隔离',async()=>{
+  const otherHouse=randomUUID();
+  await db.query('insert into momentnest.households(id,name) values($1,$2)',[otherHouse,'另一家庭']);
+  await db.query('insert into momentnest.subjects(household_id) values($1)',[otherHouse]);
+  await db.query("insert into momentnest.members(household_id,auth_user_id,label) values($1,$2,'爸爸')",[otherHouse,other]);
+  const id=await saveEvent(tx,other,{...input(),occurredOn:'2026-02-02'});
+  const theirs=await homeData(db,other),ours=await homeData(db,father);
+  expect(theirs.page.items.map(e=>e.id)).toEqual([id]);
+  expect(theirs.days).toEqual([{date:'2026-02-02',count:1}]);
+  expect(ours.page.items.some(e=>e.id===id)).toBe(false);
+  expect(ours.days.some(d=>d.date==='2026-02-02')).toBe(false);
+ });
 });

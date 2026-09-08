@@ -11,7 +11,8 @@ export async function proxy(request: NextRequest) {
         for(const {name,value,options} of values) response.cookies.set(name,value,options);
       },
     }});
-    try{await auth.auth.getUser();}catch{/* Route-level guards deny access if refresh fails. */}
+    // Refresh/verify the token here; route guards still call getUser for live validation.
+    try{await auth.auth.getClaims();}catch{/* Route-level guards deny access if refresh fails. */}
   }
   response.headers.set('Cache-Control','private, no-store, max-age=0');
   return response;
