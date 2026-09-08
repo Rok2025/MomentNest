@@ -24,6 +24,8 @@ jobs:
           node-version: '24.17.0'
       - run: npm install --global pnpm@11.19.0
       - run: pnpm install --frozen-lockfile
+      - name: Install Linux media test tools
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends ffmpeg libheif-examples
       - run: pnpm lint && pnpm typecheck && pnpm test
       - run: bash deploy/test-activation.sh
       # Build without production secrets; runtime config stays on the server.

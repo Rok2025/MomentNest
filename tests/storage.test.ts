@@ -22,7 +22,11 @@ describe('real local immutable storage and processing',()=>{
  it('真实照片生成预览，未知拍摄时间不被上传时间替代，原件哈希不变',async()=>{const data=await sharp({create:{width:60,height:40,channels:3,background:'#557744'}}).png().toBuffer(),k=key();await fetch(ticket(k,'put',data.length),{method:'PUT',headers:{Origin:origin},body:data});const sha=createHash('sha256').update(data).digest('hex');const result=await processMedia({mediaId:randomUUID(),token:randomUUID(),generation:1,attempts:1,key:k,kind:'image',sha256:sha});expect(result.capturedText).toBeNull();expect((await sharp(objectPath(result.previewKey)).metadata()).format).toBe('jpeg');expect(createHash('sha256').update(await readFile(objectPath(k))).digest('hex')).toBe(sha);});
  it('本机HEIC解码生成JPEG预览且不改原件',async()=>{
   const input=join(root,'source.png'),output=join(root,'source.heic');await sharp({create:{width:60,height:40,channels:3,background:'#557744'}}).png().toFile(input);
-  await promisify(execFile)('sips',['-s','format','heic',input,'--out',output],{timeout:30000});
+  if(process.platform==='darwin')await promisify(execFile)('sips',['-s','format','heic',input,'--out',output],{timeout:30000});
+  else{
+   process.env.HEIF_CONVERT_PATH='/usr/bin/heif-convert';
+   await promisify(execFile)('heif-enc',['-q','50','-o',output,input],{timeout:30000});
+  }
   const data=await readFile(output),k=key();expect((await fetch(ticket(k,'put',data.length),{method:'PUT',headers:{Origin:origin},body:data})).status).toBe(201);
   const result=await processMedia({mediaId:randomUUID(),token:randomUUID(),generation:1,attempts:1,key:k,kind:'image',sha256:createHash('sha256').update(data).digest('hex')});
   expect((await sharp(objectPath(result.previewKey)).metadata()).format).toBe('jpeg');expect(await readFile(objectPath(k))).toEqual(data);
