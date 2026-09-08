@@ -1,0 +1,22 @@
+node_modules/
+.next/
+.env*
+!.env.example
+work/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+supabase/.temp/
+
+.private/
+work/
+
+# Local operational notes include account contacts and machine-specific state.
+docs/*
+!docs/public-setup.md
+prototypes/
+.DS_Store
+*.log
+*.key
+*.pem

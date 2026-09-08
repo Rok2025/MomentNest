@@ -1,0 +1,50 @@
+{
+  "name": "momentnest",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1",
+    "lint": "eslint .",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run",
+    "db:check": "node --env-file-if-exists=.env.local scripts/check-db.mjs",
+    "media:serve": "tsx --env-file=.env.local workers/storage.ts",
+    "media:worker": "tsx --env-file=.env.local workers/media.ts",
+    "backup": "tsx --env-file=.env.local scripts/backup.ts",
+    "restore:check": "tsx scripts/restore-check.ts",
+    "start:local": "tsx --env-file=.env.local scripts/start-local.ts"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "dependencies": {
+    "@supabase/ssr": "0.12.6",
+    "@supabase/supabase-js": "2.115.0",
+    "exifr": "7.1.3",
+    "next": "16.3.4",
+    "pg": "8.23.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "0.0.1",
+    "sharp": "0.35.4",
+    "tsx": "4.23.13",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "@types/node": "26.4.1",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "agent-browser": "0.36.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.4",
+    "supabase": "2.116.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.0"
+  },
+  "type": "module"
+}
