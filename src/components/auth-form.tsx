@@ -9,8 +9,12 @@ export function AuthForm({mode='login',onSuccess,expectedMemberId}:{mode?:'login
   const router=useRouter();
   const action=mode==='login'?loginAction:resetAction;
   const [state,submit,pending]=useActionState(action,initial);
-  useEffect(()=>{if(state.ok&&mode==='login'){if(onSuccess)onSuccess();else {router.replace('/');router.refresh();}}},[state,mode,onSuccess,router]);
-  if(mode==='reset'&&state.ok)return <div className="auth-complete" role="status"><div className="auth-result-icon" aria-hidden="true">✓</div><h1>密码已更新</h1><p>现在可以使用新密码回到 MomentNest。</p><Link href="/login" className="button primary">使用新密码登录</Link></div>;
+  useEffect(()=>{
+    if(!state.ok)return;
+    if(mode==='reset'){router.replace('/login?reset=success');return;}
+    if(onSuccess)onSuccess();else {router.replace('/');router.refresh();}
+  },[state,mode,onSuccess,router]);
+  if(mode==='reset'&&state.ok)return <p role="status">密码已更新，正在前往登录页… <Link href="/login?reset=success">立即登录</Link></p>;
   return <form action={submit} className="form-stack">
     {mode==='reset'&&<><h1>设置新密码</h1><p className="muted">设置至少 12 位的新密码，两次输入需一致。</p></>}
     {expectedMemberId&&<input type="hidden" name="expectedMemberId" value={expectedMemberId}/>}
