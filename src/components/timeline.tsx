@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useState,useRef,useEffect,useId } from 'react';
 import { Heatmap } from './heatmap';
+import { NewEventButton } from './new-event-dialog';
 import { Cover } from './media-gallery';
 import { ageOn,isCalendarDate } from '@/domain/dates';
 import { addDays,addMonths,type DayCount,type WindowState } from '@/domain/heatmap';
@@ -14,7 +15,11 @@ export function Timeline({initial,days,today,memberId,initialRange,initialPages=
  const months=[...new Set(days.filter(day=>day.count>0).map(day=>day.date.slice(0,7)))].sort().reverse();
  const [restoredWindow,setRestoredWindow]=useState<WindowState|undefined>(undefined);
  const [page,setPage]=useState(initial),[range,setRange]=useState(initialRange),[pages,setPages]=useState(initialPages),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ // Server refreshes after saving must update the feed without remounting its calendar.
+ const [previousInitial,setPreviousInitial]=useState(initial);
+ if(previousInitial!==initial){setPreviousInitial(initial);setPage(initial);setRange(initialRange);setPages(initialPages);setBusy(false);setError('');}
  const request=useRef<AbortController|null>(null),view=useRef<WindowState|undefined>(undefined);
+ useEffect(()=>()=>request.current?.abort(),[initial]);
  useEffect(()=>{try{const saved=JSON.parse(sessionStorage.getItem(`momentnest:view:${memberId}`)||'null');const w=saved?.window;if(location.hash&&w&&['day','week','month'].includes(w.grain)&&[w.start,w.end,w.focus].every(isCalendarDate)&&w.start>='2025-01-01'&&w.end<=today.slice(0,4)+'-12-31'&&w.start<=w.end){
  // Restore this account's local navigation state after hydration.
  // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -39,6 +44,6 @@ export function Timeline({initial,days,today,memberId,initialRange,initialPages=
  </div>
  {range&&<div className="journal-range"><span>{range.start} — {range.end}</span><button type="button" onClick={()=>void load(undefined)} disabled={busy}>清除日期筛选 ×</button></div>}
  {error&&<div className="notice" role="alert">{error} <button onClick={()=>void load(range)}>重试</button></div>}
- <div aria-busy={busy}>{!page.items.length?<section className="panel empty journal-empty"><div className="empty-mark" aria-hidden="true">✦</div><h2>{range?'这一段日子，还没有记录':'第一段回忆，从这里开始'}</h2><p>{range?'换个时间看看，或者补记这段日子的小事。':'第一次伸手、一个小小的笑容，或是今天的心情。'}</p><Link className="button primary" href="/events/new">记下一刻</Link></section>:<section className="timeline" aria-label="按发生日期倒序的回忆">{page.items.map((e,i)=>{const month=e.occurredOn.slice(0,7),heading=month!==page.items[i-1]?.occurredOn.slice(0,7);return <div key={e.id}>{heading&&<h2 className="chapter"><small>{month.slice(0,4)} 年</small>{Number(month.slice(5))} 月</h2>}<article id={`event-${e.id}`} className={`entry ${i%2?'right':''}`}><div className="stamp"><span>{Number(e.occurredOn.slice(8))}日</span></div><div className="memory panel"><div className="card-top"><small>{e.author}记录</small><span className="age">{ageOn(e.occurredOn)}</span></div>{e.title.trim()&&<h2><Link href={`/events/${e.id}`} onClick={()=>remember(e)}>{e.title}</Link></h2>}{e.mediaCount>0&&<Link className="cover-link" href={`/events/${e.id}`} onClick={()=>remember(e)}><Cover eventId={e.id} id={e.coverMediaId}/></Link>}<p className="excerpt">{e.body||e.feeling}</p><div className="card-bottom"><span className="muted">{e.mediaCount?[e.imageCount?`${e.imageCount} 张照片`:'',e.videoCount?`${e.videoCount} 段视频`:''].filter(Boolean).join(' · '):'文字回忆'}</span><Link href={`/events/${e.id}`} onClick={()=>remember(e)}>慢慢回看 →</Link></div></div></article></div>;})}</section>}</div>
+ <div aria-busy={busy}>{!page.items.length?<section className="panel empty journal-empty"><div className="empty-mark" aria-hidden="true">✦</div><h2>{range?'这一段日子，还没有记录':'第一段回忆，从这里开始'}</h2><p>{range?'换个时间看看，或者补记这段日子的小事。':'第一次伸手、一个小小的笑容，或是今天的心情。'}</p><NewEventButton>记下一刻</NewEventButton></section>:<section className="timeline" aria-label="按发生日期倒序的回忆">{page.items.map((e,i)=>{const month=e.occurredOn.slice(0,7),heading=month!==page.items[i-1]?.occurredOn.slice(0,7);return <div key={e.id}>{heading&&<h2 className="chapter"><small>{month.slice(0,4)} 年</small>{Number(month.slice(5))} 月</h2>}<article id={`event-${e.id}`} className={`entry ${i%2?'right':''}`}><div className="stamp"><span>{Number(e.occurredOn.slice(8))}日</span></div><div className="memory panel"><div className="card-top"><small>{e.author}记录</small><span className="age">{ageOn(e.occurredOn)}</span></div>{e.title.trim()&&<h2><Link href={`/events/${e.id}`} onClick={()=>remember(e)}>{e.title}</Link></h2>}{e.mediaCount>0&&<Link className="cover-link" href={`/events/${e.id}`} onClick={()=>remember(e)}><Cover eventId={e.id} id={e.coverMediaId}/></Link>}<p className="excerpt">{e.body||e.feeling}</p><div className="card-bottom"><span className="muted">{e.mediaCount?[e.imageCount?`${e.imageCount} 张照片`:'',e.videoCount?`${e.videoCount} 段视频`:''].filter(Boolean).join(' · '):'文字回忆'}</span><Link href={`/events/${e.id}`} onClick={()=>remember(e)}>慢慢回看 →</Link></div></div></article></div>;})}</section>}</div>
  <nav className="pager">{page.next&&<button disabled={busy} onClick={()=>void load(range,true)}>{busy?'正在翻开…':'更早的回忆 ↓'}</button>}</nav></div>;
 }

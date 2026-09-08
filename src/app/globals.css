@@ -55,3 +55,28 @@ body{background-image:radial-gradient(#bcc9b21a .7px,transparent .7px);backgroun
  .journal-feed .journal-empty{margin:8px auto 24px;padding:28px 20px}
  .journal-range{align-items:flex-start;flex-wrap:wrap}
 }
+
+/* Keep the journal in place while a new memory is being written. */
+html { scrollbar-gutter: stable; }
+.new-event-dialog { width: min(720px, calc(100% - 32px)); max-height: calc(100dvh - 48px); margin: auto; padding: 0; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); color: var(--ink); box-shadow: 0 24px 90px #22301f35; overscroll-behavior: contain; }
+.new-event-dialog::backdrop { background: #23302166; backdrop-filter: blur(3px); }
+.dialog-bar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.dialog-bar > span { font-weight: 600; }
+.dialog-bar button { min-height: 44px; }
+.dialog-hint { margin: 16px 24px 0; color: var(--muted); font-size: 13px; }
+.dialog-loading { padding: 32px 24px; }
+.new-event-dialog .editor { margin: 0; padding: 24px; max-width: none; border: 0; border-radius: 0; box-shadow: none; }
+.new-event-dialog .section-heading { margin-top: 0; }
+.new-event-dialog .section-heading h1 { font-size: 28px; }
+.editor-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.editor-actions > .primary { flex: 1; }
+@media (max-width: 650px) {
+ .new-event-dialog { width: calc(100% - 16px); max-height: calc(100dvh - 24px); border-radius: 16px; }
+ .dialog-bar { padding: 10px 16px; }
+ .dialog-hint { margin: 12px 16px 0; }
+ .new-event-dialog .editor { padding: 20px 16px; }
+ .new-event-dialog .section-heading h1 { font-size: 24px; }
+ .new-event-dialog input, .new-event-dialog textarea { font-size: 16px; }
+}
+
+.dialog-saved { position: fixed; right: 20px; bottom: 20px; z-index: 10; max-width: calc(100vw - 40px); margin: 0; padding: 12px 18px; box-shadow: 0 4px 24px #22301f20; }

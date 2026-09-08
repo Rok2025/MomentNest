@@ -9,7 +9,7 @@ import { saveEventAction } from '@/app/actions/events';
 import { ageOn,BIRTHDAY,todayShanghai,validEventDate } from '@/domain/dates';
 import type { EventInput,EventRecord } from '@/domain/events';
 import { AuthForm } from './auth-form';
-export function EventEditor({initial,today,memberId,media=[],preview=false}:{initial?:EventRecord;today:string;memberId:string;media?:MediaRecord[];preview?:boolean}){
+export function EventEditor({initial,today,memberId,media=[],preview=false,onClose,onSaved,onSavingChange}:{initial?:EventRecord;today:string;memberId:string;media?:MediaRecord[];preview?:boolean;onClose?:()=>void;onSaved?:(id:string)=>void;onSavingChange?:(saving:boolean)=>void}){
   const router=useRouter();
   const [uploads,setUploads]=useState<UploadItem[]>([]),[cover,setCover]=useState<string|null>(initial?.coverMediaId||null);
   const uploadsReady=uploads.every(u=>u.status==='verified');
@@ -20,11 +20,11 @@ export function EventEditor({initial,today,memberId,media=[],preview=false}:{ini
   async function save(){
     if(preview){setMessage('这是界面预览，请从正式记录入口保存。');return;}
     if(saving.current||!uploadsReady)return;
-    saving.current=true;setBusy(true);setMessage('');
+    saving.current=true;setBusy(true);onSavingChange?.(true);setMessage('');
     if(!attempt.current)attempt.current={requestKey:crypto.randomUUID(),...(initial?{id:initial.id,expectedVersion:version}:{}),occurredOn:date,title,body,feeling,uploadIds:uploads.map(u=>u.id!),...(initial?{coverMediaId:cover}:{})};
     try{
       const result=await saveEventAction(attempt.current);
-      if(result.ok){router.push(`/?saved=1&start=${date}&end=${date}#event-${result.id}`);router.refresh();return;}
+      if(result.ok){if(onSaved)onSaved(result.id);else{router.push(`/?saved=1&start=${date}&end=${date}#event-${result.id}`);router.refresh();}return;}
       setMessage(result.message);
       if(result.code==='UNAUTHENTICATED'){setNeedsLogin(true);}
       else if(result.code==='UNAVAILABLE'){setUncertain(true);}
@@ -36,9 +36,9 @@ export function EventEditor({initial,today,memberId,media=[],preview=false}:{ini
         }
       }
     }catch{setUncertain(true);setMessage('尚未确认保存结果。请重试确认；同一次保存不会重复创建。');}
-    finally{saving.current=false;setBusy(false);}
+    finally{saving.current=false;setBusy(false);onSavingChange?.(false);}
   }
-  return <section className="editor panel"><div className="section-heading"><div><p className="eyebrow">留下这一刻</p><h1>{initial?'补充这段回忆':'今天，想留下什么？'}</h1></div><Link href={initial?`/events/${initial.id}`:'/'}>返回</Link></div>
+  return <section className="editor panel"><div className="section-heading"><div><p className="eyebrow">留下这一刻</p><h1>{initial?'补充这段回忆':'今天，想留下什么？'}</h1></div>{!onClose&&<Link href={initial?`/events/${initial.id}`:'/'}>返回</Link>}</div>
     <form className="form-stack" onSubmit={e=>{e.preventDefault();void save();}}>
       <fieldset disabled={busy||uncertain||needsLogin}>
         <label>事情发生在哪一天<input name="occurredOn" required type="date" min={BIRTHDAY} max={max} value={date} onInput={e=>setDate(e.currentTarget.value)} onChange={e=>setDate(e.target.value)}/></label>
@@ -50,7 +50,7 @@ export function EventEditor({initial,today,memberId,media=[],preview=false}:{ini
         {media.length>0&&<label>首页封面<select value={cover||''} onChange={e=>setCover(e.target.value||null)}><option value="">第一份素材</option>{media.map(m=><option key={m.id} value={m.id}>{m.filename}</option>)}</select></label>}
       </fieldset>
       <p aria-live="polite" role="alert">{message}</p>
-      <button className="primary" disabled={busy||needsLogin||!uploadsReady||(!uncertain&&(!validEventDate(date,max)||(!body.trim()&&!feeling.trim()&&!uploads.length&&!initial?.mediaCount)))}>{busy?'正在保存…':uncertain?'重试确认这次保存':'保存'}</button>
+      <div className="editor-actions"><button className="primary" disabled={busy||needsLogin||!uploadsReady||(!uncertain&&(!validEventDate(date,max)||(!body.trim()&&!feeling.trim()&&!uploads.length&&!initial?.mediaCount)))}>{busy?'正在保存…':uncertain?'重试确认这次保存':'保存'}</button>{onClose&&<button type="button" disabled={busy} onClick={onClose}>暂时关闭</button>}</div>
       {uncertain&&<p className="muted">先确认这次保存结果，再修改内容。当前输入保留在此页面。</p>}
     </form>
     {initial&&media.length>0&&<MediaGallery eventId={initial.id} initial={media}/>}

@@ -10,6 +10,7 @@ import { todayShanghai,isCalendarDate } from '@/domain/dates';
 import { Header,Unavailable } from '@/components/shell';
 import { HomeIntro } from '@/components/home-intro';
 import { Timeline } from '@/components/timeline';
+import { NewEventDialog } from '@/components/new-event-dialog';
 export const dynamic='force-dynamic';
 type HomeProps={searchParams:Promise<Record<string,string|undefined>>};
 export default async function Home(props:HomeProps){
@@ -32,5 +33,5 @@ async function HomeContent({searchParams,authId}:HomeProps&{authId:string}){
   return <Unavailable message={error instanceof DomainError&&error.code==='FORBIDDEN'?'此账号尚未加入家庭，或已停用。':'暂时读不到回忆，请稍后再试。'}/>;
  }
  const {member,page,days}=data;
-  return <><Header label={member.label}/><HomeIntro today={today}/>{q.saved==='1'&&<p className="success" role="status">记录已保存。照片与视频原件已收好，预览如需处理会在后台继续。</p>}<Timeline initial={page} days={days} today={today} memberId={member.id} initialRange={range} initialPages={pages}/></>;
+  return <><Header label={member.label}/><NewEventDialog memberId={member.id}><HomeIntro today={today}/>{q.saved==='1'&&<p className="success" role="status">记录已保存。照片与视频原件已收好，预览如需处理会在后台继续。</p>}<Timeline initial={page} days={days} today={today} memberId={member.id} initialRange={range} initialPages={pages}/></NewEventDialog></>;
 }
