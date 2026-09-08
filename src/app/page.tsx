@@ -22,7 +22,7 @@ export default async function Home(props:HomeProps){
  return <Suspense fallback={<HomeLoading/>}><HomeContent {...props} authId={authId}/></Suspense>;
 }
 function HomeLoading(){
- return <><header className="topbar"><Link className="brand" href="/">MomentNest<span>又又的成长手账</span></Link></header><section className="panel empty" aria-busy="true"><p className="eyebrow">欢迎回家</p><h1>正在打开我们的回忆…</h1><p role="status">正在读取成长记录，请稍候。</p></section></>;
+ return <><header className="topbar"><Link className="brand" href="/">拾光记<span>又又的成长手账</span></Link></header><section className="panel empty" aria-busy="true"><p className="eyebrow">欢迎回家</p><h1>正在打开我们的回忆…</h1><p role="status">正在读取成长记录，请稍候。</p></section></>;
 }
 async function HomeContent({searchParams,authId}:HomeProps&{authId:string}){
  const q=await searchParams,today=todayShanghai(),range=q.start&&q.end&&isCalendarDate(q.start)&&isCalendarDate(q.end)&&q.start<=q.end?{start:q.start,end:q.end}:undefined;
