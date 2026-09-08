@@ -14,7 +14,16 @@ describe('password recovery delivery feedback',()=>{
     vi.spyOn(console,'warn').mockImplementation(()=>{});
     const result=await requestPasswordRecovery(async()=>({error}));
     expect(result.ok).toBe(false);
-    expect(result.message).toContain('过于频繁');
+    expect(result.retryLimited).toBe(true);
+    expect(result.message).not.toContain('60');
+  });
+  it('distinguishes email quota from request throttling',async()=>{
+    const warning=vi.spyOn(console,'warn').mockImplementation(()=>{});
+    const quota=await requestPasswordRecovery(async()=>({error:{code:'over_email_send_rate_limit',status:429}}));
+    const requests=await requestPasswordRecovery(async()=>({error:{code:'over_request_rate_limit',status:429}}));
+    expect(quota.message).toContain('发送额度');
+    expect(requests.message).toContain('频率限制');
+    expect(warning.mock.calls).toEqual([['[auth-recovery] email_rate_limited'],['[auth-recovery] request_rate_limited']]);
   });
   it.each([{code:'email_address_not_authorized',status:403},{status:500},{code:'unexpected_failure'}])('reports service failure without exposing provider details (%j)',async error=>{
     const warning=vi.spyOn(console,'warn').mockImplementation(()=>{});

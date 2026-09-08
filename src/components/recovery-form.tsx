@@ -49,7 +49,7 @@ export function RecoveryForm(){
     <form action={submit} className="form-stack">
       {confirmed?<input name="email" type="hidden" value={submittedEmail}/>:<label>邮箱<input required name="email" type="email" autoComplete="email" inputMode="email" value={email} onChange={event=>setEmail(event.target.value)} readOnly={pending} placeholder="输入受邀邮箱"/></label>}
       {showFeedback&&state.message&&<p className={state.ok&&confirmed?'sr-only':state.ok?'notice':'auth-error'} role={state.ok?'status':'alert'}>{state.message}</p>}
-      <button disabled={pending||remaining>0} className={confirmed?'':'primary'}>{pending?'正在提交…':remaining>0?`${remaining} 秒后可重新发送`:confirmed?'重新发送邮件':'发送恢复邮件'}</button>
+      <button disabled={pending||remaining>0} className={confirmed?'':'primary'}>{pending?'正在提交…':state.retryLimited?'稍后重试':remaining>0?`${remaining} 秒后可重新发送`:confirmed?'重新发送邮件':'发送恢复邮件'}</button>
       {confirmed&&<button type="button" disabled={pending} onClick={()=>{setEditing(true);setShowFeedback(false);}}>修改邮箱</button>}
       <Link className="recovery-back" href="/login">返回登录</Link>
     </form>

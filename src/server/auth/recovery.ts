@@ -10,9 +10,17 @@ export async function requestPasswordRecovery(send:()=>Promise<{error:unknown}>)
     const code=typeof error==='object'&&'code' in error?error.code:undefined;
     const status=typeof error==='object'&&'status' in error?error.status:undefined;
     if(code==='user_not_found')return accepted;
-    if(status===429||code==='over_email_send_rate_limit'||code==='over_request_rate_limit') {
+    if(code==='over_email_send_rate_limit') {
+      console.warn('[auth-recovery] email_rate_limited');
+      return {ok:false,retryLimited:true,message:'邮件服务已触发发送额度限制，本次未发送恢复邮件。请等待额度恢复后再试；连续点击不会加快恢复。'};
+    }
+    if(code==='over_request_rate_limit') {
+      console.warn('[auth-recovery] request_rate_limited');
+      return {ok:false,retryLimited:true,message:'恢复请求暂时受到频率限制，请稍后再试。服务未提供准确恢复时间。'};
+    }
+    if(status===429) {
       console.warn('[auth-recovery] rate_limited');
-      return {ok:false,message:'邮件发送过于频繁，请稍后再试。若持续收不到，请联系管理员检查邮件额度。'};
+      return {ok:false,retryLimited:true,message:'恢复服务暂时限制了请求，请稍后再试。服务未提供准确恢复时间。'};
     }
     // Never log provider messages, addresses, or recovery tokens.
     console.warn('[auth-recovery] delivery_request_failed');

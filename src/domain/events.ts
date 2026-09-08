@@ -28,4 +28,4 @@ export class DomainError extends Error {
   constructor(public code: ErrorCode, message: string) { super(message); }
 }
 export type SaveResult = { ok: true; id: string } | { ok: false; code: ErrorCode; message: string };
-export type AuthResult = { ok: boolean; message: string };
+export type AuthResult = { ok: boolean; message: string; retryLimited?: boolean };
