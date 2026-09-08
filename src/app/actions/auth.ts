@@ -5,6 +5,7 @@ import { appUrl } from '@/server/config';
 import { database } from '@/server/db';
 import { memberFor } from '@/server/event-store';
 import type { AuthResult } from '@/domain/events';
+import { requestPasswordRecovery } from '@/server/auth/recovery';
 export async function loginAction(_prev:AuthResult,form:FormData):Promise<AuthResult> {
   const parsed=z.object({email:z.email(),password:z.string().min(1).max(200),expectedMemberId:z.string().uuid().optional()}).safeParse(Object.fromEntries(form));
   if(!parsed.success)return {ok:false,message:'请输入有效邮箱和密码'};
@@ -20,11 +21,12 @@ export async function logoutAction():Promise<AuthResult> {
   catch{return {ok:false,message:'退出失败，请重试'};}
 }
 export async function forgotAction(_prev:AuthResult,form:FormData):Promise<AuthResult> {
-  const email=z.email().safeParse(form.get('email'));
+  const email=z.string().trim().pipe(z.email()).safeParse(form.get('email'));
   if(!email.success)return {ok:false,message:'请输入有效邮箱'};
-  try{const auth=await authClient();await auth.auth.resetPasswordForEmail(email.data,{redirectTo:`${appUrl()}/auth/callback?next=/reset-password`});}
-  catch{/* Uniform result avoids account enumeration. */}
-  return {ok:true,message:'如果这个邮箱可以恢复账号，你将收到重置邮件。请检查收件箱。'};
+  return requestPasswordRecovery(async()=>{
+    const auth=await authClient();
+    return auth.auth.resetPasswordForEmail(email.data,{redirectTo:`${appUrl()}/auth/callback?next=/reset-password`});
+  });
 }
 export async function resetAction(_prev:AuthResult,form:FormData):Promise<AuthResult> {
   const password=z.string().min(12).max(128).safeParse(form.get('password'));
