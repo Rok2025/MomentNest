@@ -15,7 +15,11 @@ export function storageServer(){
   if(req.method==='OPTIONS'){if(req.headers.origin!==allowed){res.writeHead(403).end();return;}res.setHeader('Access-Control-Allow-Methods','GET, PUT, OPTIONS');res.setHeader('Access-Control-Allow-Headers','Content-Type,Range');res.writeHead(204).end();return;}
   let temp:string|undefined,key:string|undefined;
   try{
-   const url=new URL(req.url||'/',allowed);if(url.pathname!=='/object')throw Error('NOT_FOUND');
+   const url=new URL(req.url||'/',allowed);
+   if(url.pathname==='/health'&&req.method==='GET'){
+    await stat(storageRoot());res.writeHead(200,{'Content-Type':'application/json'}).end('{"ok":true}');return;
+   }
+   if(url.pathname!=='/object')throw Error('NOT_FOUND');
    const t=verifyTicket(url.searchParams.get('ticket')||''),path=objectPath(t.key);
    if(req.method==='PUT'&&t.operation==='put'){
     if(req.headers.origin!==allowed)throw Error('FORBIDDEN');

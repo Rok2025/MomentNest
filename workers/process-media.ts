@@ -17,7 +17,12 @@ export async function processMedia(j:Job):Promise<Processed>{
   try{const tags=await exifr.parse(original,{pick:['DateTimeOriginal','OffsetTimeOriginal'],reviveValues:false});if(tags?.DateTimeOriginal){capturedText=String(tags.DateTimeOriginal);capturedZone=tags.OffsetTimeOriginal?String(tags.OffsetTimeOriginal):null;}}catch{}
   let source=original;const fallback=preview+'.converted.png';
   try{await sharp(source,{limitInputPixels:100000000}).metadata();await sharp(source,{limitInputPixels:100000000}).rotate().resize({width:1920,height:1920,fit:'inside',withoutEnlargement:true}).withIccProfile('srgb').jpeg({quality:88}).toFile(preview);}
-  catch(e){if(process.platform!=='darwin')throw e;await run('/usr/bin/sips',['-s','format','png',original,'--out',fallback],{timeout:60000,maxBuffer:1024*1024});source=fallback;try{await sharp(source,{limitInputPixels:100000000}).rotate().resize({width:1920,height:1920,fit:'inside',withoutEnlargement:true}).withIccProfile('srgb').jpeg({quality:88}).toFile(preview);}finally{await rm(fallback,{force:true});}}
+  catch(e){
+   if(process.platform==='darwin')await run('/usr/bin/sips',['-s','format','png',original,'--out',fallback],{timeout:60000,maxBuffer:1024*1024});
+   else if(process.env.HEIF_CONVERT_PATH)await run(process.env.HEIF_CONVERT_PATH,[original,fallback],{timeout:60000,maxBuffer:1024*1024});
+   else throw e;
+   source=fallback;try{await sharp(source,{limitInputPixels:100000000}).rotate().resize({width:1920,height:1920,fit:'inside',withoutEnlargement:true}).withIccProfile('srgb').jpeg({quality:88}).toFile(preview);}finally{await rm(fallback,{force:true});}
+  }
   const info=await sharp(preview).metadata();return {previewKey,playbackKey:null,capturedText,capturedZone,metadata:{width:info.width,height:info.height,previewColor:'sRGB'}};
  }
  const probe=JSON.parse((await run(process.env.FFPROBE_PATH||'ffprobe',['-v','error','-protocol_whitelist','file,pipe','-show_format','-show_streams','-of','json',original],{timeout:30000,maxBuffer:4*1024*1024})).stdout);

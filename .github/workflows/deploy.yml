@@ -1,0 +1,84 @@
+name: Deploy MomentNest to Huawei Cloud
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: momentnest-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24.17.0'
+      - run: npm install --global pnpm@11.19.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint && pnpm typecheck && pnpm test
+      - run: bash deploy/test-activation.sh
+      # Build without production secrets; runtime config stays on the server.
+      - run: pnpm build
+      - name: Package Linux release
+        run: |
+          set -euo pipefail
+          pnpm prune --prod
+          printf '%s\n' "$GITHUB_SHA" > COMMIT
+          tar --exclude='.next/cache' -czf /tmp/momentnest.tgz .next node_modules package.json next.config.mjs tsconfig.json config src workers scripts deploy COMMIT
+      - name: Configure deployment SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.HUAWEI_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.HUAWEI_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ vars.HUAWEI_DEPLOY_HOST }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_KEY" && test -n "$KNOWN_HOSTS" && test -n "$DEPLOY_HOST"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/momentnest_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/momentnest_deploy ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<CONFIG
+          Host momentnest-production
+            HostName $DEPLOY_HOST
+            User momentnest-deploy
+            IdentityFile ~/.ssh/momentnest_deploy
+            IdentitiesOnly yes
+            BatchMode yes
+            StrictHostKeyChecking yes
+            ConnectTimeout 15
+          CONFIG
+          chmod 600 ~/.ssh/config
+      - name: Upload and check release
+        run: |
+          set -euo pipefail
+          release="gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${GITHUB_SHA}"
+          sha256sum /tmp/momentnest.tgz | cut -d ' ' -f1 > /tmp/momentnest.sha256
+          ssh momentnest-production "mkdir /opt/apps/momentnest/releases/$release"
+          scp /tmp/momentnest.tgz /tmp/momentnest.sha256 "momentnest-production:/opt/apps/momentnest/releases/$release/"
+          ssh momentnest-production "cd /opt/apps/momentnest/releases/$release && echo \"\$(cat momentnest.sha256)  momentnest.tgz\" | sha256sum -c - && tar -xzf momentnest.tgz && rm momentnest.tgz momentnest.sha256"
+          ssh momentnest-production "cd /opt/apps/momentnest/releases/$release && node --env-file=/etc/momentnest/runtime.env deploy/preflight.mjs"
+      - name: Activate production
+        if: vars.PRODUCTION_ENABLED == 'true'
+        run: |
+          release="gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${GITHUB_SHA}"
+          ssh momentnest-production bash -s -- "$release" "$GITHUB_SHA" < deploy/activate-release.sh
+      - name: Verify public release
+        if: vars.PRODUCTION_ENABLED == 'true'
+        run: |
+          node deploy/verify-public.mjs "$GITHUB_SHA" https://nest.rokzhang.cn
+          printf 'Deployed `%s` to https://nest.rokzhang.cn\n' "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+      - name: Report pending domain setup
+        if: vars.PRODUCTION_ENABLED != 'true'
+        run: echo 'Build, upload and server preflight complete. Production activation is paused until DNS, HTTPS and Auth callbacks are ready. Set PRODUCTION_ENABLED=true, then dispatch this workflow.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove SSH credentials
+        if: always()
+        run: rm -f ~/.ssh/momentnest_deploy ~/.ssh/config ~/.ssh/known_hosts
