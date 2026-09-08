@@ -16,7 +16,7 @@
 
 ## 技术栈
 
-Next.js 16、React 19、TypeScript、Supabase Auth、PostgreSQL、Sharp、FFmpeg和独立媒体worker。当前媒体存储实现使用本地磁盘，HEIC解码有macOS `sips` 回退。
+Next.js 16、React 19、TypeScript、Supabase Auth、PostgreSQL、Sharp、FFmpeg和独立媒体worker。当前媒体存储实现使用本地磁盘，HEIC解码支持macOS `sips` 或Linux `heif-convert` 回退。
 
 ## 本地启动
 
@@ -51,6 +51,6 @@ V1功能代码、41项自动测试、类型检查、lint和生产构建已通过
 
 当前是单家庭定制版本，UI称呼、固定生日及日期下限属于现有业务合同；复用时须一致调整日期模型、数据库约束和相关测试，不能只改一个显示值。没有公开注册、搜索、AI、删除/回收站、孩子账号或公开分享功能。
 
-规划的正式入口为 `https://nest.rokzhang.cn`，仓库发布不代表网站已部署。长期在线存储、异机备份与正式部署仍待落实。
+正式入口选定为 `https://nest.rokzhang.cn`。GitHub Actions已配置：main推送后自动测试、构建Linux发布包并上传华为云；启用生产开关后自动激活，检查失败回退。首次激活仍待DNS、HTTPS与认证回调就绪，配置方法见下方部署说明。线上媒体使用服务器私有磁盘，异机备份另行配置。
 
 更多说明见 [安装、权限与部署配置](docs/public-setup.md)。内部账号和运维记录、历史概念原型、生成物、媒体与备份仅保留在维护者本地。
