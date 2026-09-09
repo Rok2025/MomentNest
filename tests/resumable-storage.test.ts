@@ -11,7 +11,8 @@ let root:string,base:string;const server=storageServer(),origin='http://localhos
 const data=Buffer.alloc(chunk*2+100,7);data.set([137,80,78,71,13,10,26,10]);
 const makeKey=()=>`originals/${randomUUID()}/${randomUUID()}.bin`;
 const url=(key:string,operation:'get'|'put'='put',expires=Date.now()+60000)=>`${base}/object?ticket=${signTicket({key,operation,expires,size:data.length,kind:'image'})}`;
-const head=(u:string)=>fetch(u,{method:'HEAD',headers:{Origin:origin}});
+// Same-origin browser HEAD requests omit Origin, unlike upload PUT/POST requests.
+const head=(u:string)=>fetch(u,{method:'HEAD'});
 const put=(u:string,start:number,body=data.subarray(start,Math.min(start+chunk,data.length)))=>fetch(u,{method:'PUT',headers:{Origin:origin,'Content-Range':`bytes ${start}-${start+body.length-1}/${data.length}`},body});
 beforeAll(async()=>{root=await mkdtemp(join(tmpdir(),'nest-resume-'));process.env.MEDIA_ROOT=root;process.env.APP_URL=origin;process.env.MEDIA_SIGNING_SECRET='test-only-'+randomUUID()+randomUUID();server.listen(0,'127.0.0.1');await once(server,'listening');base=`http://127.0.0.1:${(server.address() as {port:number}).port}`;});
 afterAll(async()=>{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));await rm(root,{recursive:true,force:true});});
@@ -49,13 +50,38 @@ describe('resumable private originals over HTTP',()=>{
   expect((await fetch(u,{method:'POST',headers:{Origin:origin},body:''})).status).toBe(201);
   expect((await readFile(path)).equals(data)).toBe(true);
  });
- it('requires signed upload permission and same origin, exposes offsets for the uploader',async()=>{
+ it('allows signed progress queries without Origin and still exposes offsets with an allowed Origin',async()=>{
+  const u=url(makeKey());
+  const cases:Record<string,string>[]=[{},{Origin:origin}];
+  for(const headers of cases){
+   const response=await fetch(u,{method:'HEAD',headers});
+   expect(response.status).toBe(200);expect(response.headers.get('Upload-Offset')).toBe('0');
+   expect(response.headers.get('Upload-Complete')).toBe('0');
+  }
+ });
+ it('requires signed upload permission and rejects untrusted explicit origins',async()=>{
   const key=makeKey();expect((await head(url(key,'put',Date.now()-1))).status).toBe(400);
+  expect((await head(`${base}/object?ticket=invalid`)).status).toBe(400);
   expect((await head(url(key,'get'))).status).toBe(403);
   expect((await fetch(url(key),{method:'HEAD',headers:{Origin:'https://evil.invalid'}})).status).toBe(400);
+  expect((await fetch(url(key),{method:'HEAD',headers:{Origin:'null'}})).status).toBe(400);
   expect((await fetch(url(key),{method:'POST',headers:{Origin:origin},body:''})).status).toBe(400);
   const preflight=await fetch(url(key),{method:'OPTIONS',headers:{Origin:origin}});
   expect(preflight.headers.get('Access-Control-Allow-Headers')).toContain('Content-Range');
   expect(preflight.headers.get('Access-Control-Expose-Headers')).toContain('Upload-Offset');
+ });
+ it('still requires an allowed Origin for writes and preflight requests',async()=>{
+  const key=makeKey(),u=url(key),path=objectPath(key);
+  // Complete staged chunks make finalization possible, so a rejection proves the origin check runs.
+  await mkdir(path+'.parts',{recursive:true});
+  for(let start=0;start<data.length;start+=chunk)await writeFile(path+'.parts/'+start,data.subarray(start,Math.min(start+chunk,data.length)));
+  const cases:Record<string,string>[]=[{},{Origin:'https://evil.invalid'}];
+  for(const headers of cases){
+   expect((await fetch(u,{method:'POST',headers,body:''})).status).toBe(400);
+   expect((await fetch(u,{method:'PUT',headers,body:data})).status).toBe(400);
+   expect((await fetch(u,{method:'PUT',headers:{...headers,'Content-Range':`bytes 0-${chunk-1}/${data.length}`},body:data.subarray(0,chunk)})).status).toBe(400);
+   expect((await fetch(u,{method:'OPTIONS',headers})).status).toBe(403);
+  }
+  await expect(readFile(path)).rejects.toThrow();
  });
 });

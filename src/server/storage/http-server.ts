@@ -23,7 +23,9 @@ export function storageServer(){
    if(url.pathname!=='/object')throw Error('NOT_FOUND');
    const t=verifyTicket(url.searchParams.get('ticket')||''),path=objectPath(t.key);
    if(t.operation==='put'&&(req.method==='HEAD'||req.method==='POST'||(req.method==='PUT'&&req.headers['content-range']))){
-    if(req.headers.origin!==allowed||!t.size||!Number.isSafeInteger(t.size)||t.size>524288000||t.size<=0)throw Error('FORBIDDEN');
+    // Same-origin browser HEAD omits Origin. Only signed, read-only progress queries may omit it.
+    const originAllowed=req.headers.origin===allowed||(req.method==='HEAD'&&req.headers.origin===undefined);
+    if(!originAllowed||!t.size||!Number.isSafeInteger(t.size)||t.size>524288000||t.size<=0)throw Error('FORBIDDEN');
     if(active.has(t.key)||inFlight>=3){res.writeHead(409).end();return;}
     key=t.key;active.add(key);inFlight++;
     const state=await resumeState(path,t.size);
