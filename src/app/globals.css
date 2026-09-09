@@ -113,3 +113,10 @@ html { scrollbar-gutter: stable; }
 .upload-picker:focus-within{outline:3px solid #86a075;outline-offset:3px}.editor [role=alert]:empty{display:none}.editor .upload-box .upload-picker{cursor:pointer;margin:0;padding:14px;border:1px dashed var(--line);border-radius:12px;text-align:center}.editor .upload-box{padding:12px}.editor .upload-list:empty{display:none}
 
 .iso-date{position:relative;display:inline-flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:8px 12px;background:#fff;border:1px solid var(--line);border-radius:10px;color:var(--ink);font-size:16px;font-variant-numeric:tabular-nums;white-space:nowrap}.iso-date>span,.iso-date>svg{pointer-events:none}.form-stack .iso-date input[type=date]{position:absolute;inset:0;display:block;width:100%;height:100%;min-height:0;max-width:none;margin:0;padding:0;opacity:0;cursor:pointer}.iso-date:focus-within{outline:3px solid #86a075;outline-offset:3px}.iso-date:has(input:disabled){opacity:.5}.upload-list .media-date .iso-date{display:flex;width:fit-content;max-width:100%;margin:4px 0}
+
+/* Upload dates stay secondary to the memory and the selected media. */
+.upload-list .media-date{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px;font-size:12px;line-height:1.4}
+.upload-list .media-date>span:first-child{white-space:nowrap;color:var(--muted)}
+.upload-list .media-date .iso-date{display:inline-flex;gap:6px;min-height:32px;margin:0;padding:4px 7px;border-radius:7px;background:transparent;font-size:13px;line-height:1.4}
+.upload-list .media-date .iso-date>svg{width:12px;height:12px;opacity:.7}
+.upload-list .media-date small{flex-basis:100%}
