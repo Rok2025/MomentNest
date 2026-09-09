@@ -2,6 +2,7 @@
 import Image from 'next/image';
 import { useEffect,useState,useRef } from 'react';
 import type { MediaRecord } from '@/domain/media';
+import { formatCaptureTime } from '@/domain/capture-date';
 async function getUrl(id:string,variant:string){const r=await fetch(`/api/media/${id}/url`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({variant}),cache:'no-store'});if(!r.ok)throw Error('素材暂不可用，请重新登录或稍后重试');return (await r.json()).url as string;}
 export function MediaView({media,compact=false}:{media:MediaRecord;compact?:boolean}){
  const [preview,setPreview]=useState(''),[playback,setPlayback]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);const [refresh,setRefresh]=useState(0);const video=useRef<HTMLVideoElement>(null),resume=useRef(0);
@@ -10,7 +11,7 @@ export function MediaView({media,compact=false}:{media:MediaRecord;compact?:bool
  return <figure className={`media-item ${compact?'compact':''}`}>
   {media.kind==='video'&&playback&&!compact?<video ref={video} src={playback} poster={preview||undefined} controls playsInline preload="metadata" onLoadedMetadata={()=>{if(video.current&&resume.current)video.current.currentTime=resume.current;}} onError={()=>setError('播放链接可能已过期，请刷新播放链接后继续。')}/>:preview?<Image unoptimized width={1920} height={1280} src={preview} alt={compact?'回忆封面':media.filename} loading="lazy" onError={()=>setError('预览链接已过期，可刷新重试')}/>:<div className="media-placeholder"><span>{media.kind==='video'?'▷':'▧'}</span><p>{media.status==='failed'?'原件已保存，预览处理失败':media.status==='ready'?'预览加载中':'原件已保存，正在处理'}</p></div>}
   {compact&&media.kind==='video'&&<span className="video-badge">▷ 视频</span>}
-  {!compact&&<figcaption><strong>{media.filename}</strong><p className="muted">拍摄时间：{media.capturedText||'未知'}{media.capturedText?`（${media.capturedZone||'时区未知'}）`:''}</p><div className="media-actions">
+  {!compact&&<figcaption><strong>{media.filename}</strong><p className="muted">拍摄时间：{formatCaptureTime(media.capturedText,media.capturedZone)}</p><div className="media-actions">
    {media.kind==='video'&&media.hasPlayback&&<button type="button" disabled={busy} onClick={()=>void play()}>{playback?'刷新播放链接':'加载视频'} ▷</button>}
    <button type="button" onClick={()=>void getUrl(media.id,'original').then(u=>{window.location.assign(u);}).catch(()=>setError('原件暂不可用，请稍后重试'))}>下载原件</button>
    {media.status==='failed'&&<button type="button" onClick={()=>void fetch(`/api/media/${media.id}/retry`,{method:'POST'}).then(r=>setError(r.ok?'已安排重新处理':'重试失败，请稍后再试'))}>重新处理</button>}

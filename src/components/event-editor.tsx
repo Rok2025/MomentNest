@@ -1,4 +1,5 @@
 'use client';
+import { DateField } from './date-field';
 import { Uploader,type UploadItem } from './uploader';
 import { MediaGallery } from './media-gallery';
 import type { MediaRecord } from '@/domain/media';
@@ -42,7 +43,7 @@ export function EventEditor({initial,today,memberId,media=[],preview=false,onClo
   return <section className="editor panel"><div className={onClose?"sr-only":"section-heading"}><div><h1>{initial?'补充这段回忆':'记下一刻'}</h1></div>{!onClose&&<Link href={initial?`/events/${initial.id}`:'/'}>返回</Link>}</div>
     <form className="form-stack" onSubmit={e=>{e.preventDefault();void save();}}>
       <fieldset disabled={busy||uncertain||needsLogin}>
-        <label className="editor-date">记录日期<input name="occurredOn" required type="date" min={BIRTHDAY} max={max} value={date} onInput={e=>setDate(e.currentTarget.value)} onChange={e=>setDate(e.target.value)}/></label>
+        <label className="editor-date">记录日期<DateField name="occurredOn" label="记录日期" required min={BIRTHDAY} max={max} value={date} onChange={setDate}/></label>
         <label className="sr-only" htmlFor="memory-body">记录内容</label>
         <textarea id="memory-body" aria-label="记录内容" maxLength={20000} rows={5} value={body} onChange={e=>setBody(e.target.value)} placeholder="写下这一刻，或直接添加照片和视频…"/>
         <Uploader items={uploads} onChange={setUploads} date={date} today={max} disabled={preview||busy||uncertain||needsLogin} existing={initial?.mediaCount||0} onExpired={()=>setNeedsLogin(true)}/>
