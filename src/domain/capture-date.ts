@@ -33,3 +33,21 @@ export function formatCaptureTime(text: string | null, zone: string | null = nul
   const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === type)?.value;
   return `${part('year')}-${part('month')}-${part('day')} ${part('hour')}:${part('minute')}:${part('second')}（北京时间）`;
 }
+
+// Compare zoned times in Beijing time; unzoned camera times keep their displayed
+// wall-clock order. The fallback offset is only a sorting convention, not metadata.
+function captureSortTime(text: string | null, zone: string | null): number | null {
+  if (!text || !captureDate(text, zone)) return null;
+  const normalized = text.trim().replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3').replace(' ', 'T');
+  if (!/T\d{2}:\d{2}:\d{2}/.test(normalized)) return null;
+  const embeddedOffset = normalized.match(/(Z|[+-]\d{2}:?\d{2})$/)?.[1];
+  const offset = zone === 'UTC' ? 'Z' : zone;
+  const time = Date.parse(embeddedOffset ? normalized : normalized + (offset && /^(Z|[+-]\d{2}:?\d{2})$/.test(offset) ? offset : '+08:00'));
+  return Number.isNaN(time) ? null : time;
+}
+
+export function sortByCaptureTime<T extends { capturedText: string | null; capturedZone: string | null }>(media: readonly T[]): T[] {
+  return media.map(item => ({ item, time: captureSortTime(item.capturedText, item.capturedZone) }))
+    .sort((a, b) => a.time === null ? (b.time === null ? 0 : 1) : b.time === null ? -1 : a.time - b.time)
+    .map(({ item }) => item);
+}

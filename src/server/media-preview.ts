@@ -2,6 +2,13 @@ import type { PreviewLinks } from '../domain/media';
 import { createHash } from 'node:crypto';
 import { signedObjectUrl } from './storage/local';
 
+// Like image links, issue only after the caller has checked live membership.
+export function playbackLink(row:Record<string,unknown>){
+ if(row.kind!=='video'||!row.playback_key)return undefined;
+ const expiresAt=Date.now()+5*60*1000;
+ return {url:signedObjectUrl({key:String(row.playback_key),operation:'get',expires:expiresAt,mime:'video/mp4'}),expiresAt};
+}
+
 export type PreviewSize={key:string;width:number;height:number};
 export function previewSizes(metadata:Record<string,unknown>):PreviewSize[]{
  if(!Array.isArray(metadata.previewSizes))return [];

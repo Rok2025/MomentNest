@@ -3,7 +3,8 @@ export const MAX_IMAGE_BYTES=50*1024*1024;
 export const MAX_VIDEO_BYTES=500*1024*1024;
 export type MediaKind='image'|'video';
 export type PreviewLinks={url:string;srcSet?:string;width:number;height:number;expiresAt:number;revision:string};
-export type MediaRecord={id:string;eventId:string;filename:string;kind:MediaKind;mime:string;size:number;position:number;status:'pending'|'processing'|'ready'|'failed';capturedText:string|null;capturedZone:string|null;errorCode:string|null;hasPreview:boolean;hasPlayback:boolean;preview?:PreviewLinks};
+export type PlaybackLink={url:string;expiresAt:number};
+export type MediaRecord={id:string;eventId:string;filename:string;kind:MediaKind;mime:string;size:number;position:number;status:'pending'|'processing'|'ready'|'failed';capturedText:string|null;capturedZone:string|null;errorCode:string|null;hasPreview:boolean;hasPlayback:boolean;preview?:PreviewLinks;playback?:PlaybackLink};
 export function mediaPending(media:MediaRecord){return media.status==='pending'||media.status==='processing';}
 // Keep unchanged, still-valid image URLs during status polling to avoid redownloading them.
 export function reusePreview(previous:MediaRecord|undefined|null,next:MediaRecord,now=Date.now()):MediaRecord{

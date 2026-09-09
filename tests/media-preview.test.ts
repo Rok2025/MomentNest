@@ -46,6 +46,11 @@ describe('independent preview/video lanes and private cover reads',()=>{
   expect(await finishJob(tx,image,poster(image.mediaId))).toBe(true);
   expect(await finishJob(tx,encoding,{...poster(encoding.mediaId),playbackKey:`derivatives/${encoding.mediaId}/play.mp4`})).toBe(true);
   expect((await listMedia(db,father,clip.id))[0]).toMatchObject({status:'ready',hasPreview:true,hasPlayback:true});
+  const linked=(await listMedia(db,father,clip.id,true))[0];
+  const signed=verifyTicket(new URL(linked.playback!.url).searchParams.get('ticket')!);
+  expect(signed).toMatchObject({operation:'get',mime:'video/mp4',key:`derivatives/${encoding.mediaId}/play.mp4`,expires:linked.playback!.expiresAt});
+  expect(await listMedia(db,other,clip.id,true)).toEqual([]);
+  expect((await listMedia(db,father,photo.id,true))[0].playback).toBeUndefined();
  });
  it('过期转码仍由视频队列回收，旧租约不能回写或覆盖封面',async()=>{
   await event('video');const first=(await claimJob(tx,'preview'))!;

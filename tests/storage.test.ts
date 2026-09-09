@@ -50,8 +50,17 @@ describe('real local immutable storage and processing',()=>{
   const result=await processMedia(encoding,'playback');
   expect(result.previewKey).toBe(early.previewKey);expect(await readFile(objectPath(early.previewKey))).toEqual(posterBytes);
   expect(result.metadata.hdrSource).toBe(true);expect(result.capturedText).toContain('2025-06-01');expect(result.capturedZone).toBe('UTC');
-  const probe=JSON.parse((await promisify(execFile)('ffprobe',['-v','error','-show_streams','-of','json',objectPath(result.playbackKey!)])).stdout);expect(probe.streams[0].codec_name).toBe('h264');expect((await sharp(objectPath(result.previewKey)).metadata()).format).toBe('jpeg');expect(await readFile(objectPath(k))).toEqual(data);
+  const probe=JSON.parse((await promisify(execFile)('ffprobe',['-v','error','-show_streams','-of','json',objectPath(result.playbackKey!)])).stdout);expect(probe.streams[0].codec_name).toBe('h264');expect(probe.streams[0].pix_fmt).toBe('yuv420p');expect(result.metadata.playbackProfile).toBe('mobile-v1');expect((await sharp(objectPath(result.previewKey)).metadata()).format).toBe('jpeg');expect(await readFile(objectPath(k))).toEqual(data);
   await discardOutputs(encoding);expect(await readFile(objectPath(early.previewKey))).toEqual(posterBytes);
  },60000);
 
+ it('手机播放版限制竖屏尺寸和高帧率，保留原始文件',async()=>{
+  const fixture=join(root,'portrait.mov');await promisify(execFile)('ffmpeg',['-nostdin','-y','-v','error','-f','lavfi','-i','testsrc2=size=1080x1920:rate=60','-t','0.2','-c:v','libx264','-preset','ultrafast',fixture],{timeout:30000});
+  const data=await readFile(fixture),k=key();const url=base+'/object?ticket='+signTicket({key:k,operation:'put',expires:Date.now()+60000,size:data.length,kind:'video'});
+  expect((await fetch(url,{method:'PUT',headers:{Origin:origin},body:data})).status).toBe(201);
+  const result=await processMedia({mediaId:randomUUID(),token:randomUUID(),generation:1,attempts:1,key:k,kind:'video',sha256:createHash('sha256').update(data).digest('hex')});
+  const probe=JSON.parse((await promisify(execFile)('ffprobe',['-v','error','-show_streams','-of','json',objectPath(result.playbackKey!)])).stdout);
+  expect(probe.streams[0]).toMatchObject({width:720,height:1280,pix_fmt:'yuv420p',avg_frame_rate:'30/1'});
+  expect(await readFile(objectPath(k))).toEqual(data);
+ },60000);
 });

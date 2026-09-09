@@ -1,0 +1,2 @@
+.buffer{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;background:#0002}
+.buffer span{background:#263426dc;color:white;padding:10px 16px;border-radius:999px;font-size:13px;box-shadow:0 2px 12px #0003}

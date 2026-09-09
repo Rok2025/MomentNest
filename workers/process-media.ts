@@ -68,7 +68,13 @@ export async function processMedia(j:Job,stage:ProcessingStage='full'):Promise<P
   if(!poster)throw Error('VIDEO_PREVIEW_MISSING');
   if(stage==='preview')return {previewKey:poster,playbackKey:null,capturedText,capturedZone,metadata};
   const playbackKey=base+'.mp4';
-  await run(process.env.FFMPEG_PATH||'ffmpeg',['-nostdin','-y','-v','error','-protocol_whitelist','file,pipe','-threads','2','-i',original,'-map','0:v:0','-map','0:a:0?','-vf',filter,'-filter_threads','1','-c:v','libx264','-preset','fast','-crf','23','-threads','2','-c:a','aac','-b:a','128k','-movflags','+faststart','-map_metadata','-1',objectPath(playbackKey)],{timeout:20*60*1000,maxBuffer:4*1024*1024});
+  // Keep full-resolution originals/posters; the streaming copy fits a phone and
+  // a modest connection. Bound peaks as well as average quality, with short GOPs.
+  const playbackFilter=filter.replace(scale,"scale='min(1280,iw)':'min(1280,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2");
+  const [numerator,denominator]=String(video.avg_frame_rate||'0/1').split('/').map(Number);
+  const fps=numerator/(denominator||1);
+  await run(process.env.FFMPEG_PATH||'ffmpeg',['-nostdin','-y','-v','error','-protocol_whitelist','file,pipe','-threads','2','-i',original,'-map','0:v:0','-map','0:a:0?','-vf',playbackFilter,'-filter_threads','1','-c:v','libx264','-preset','fast','-crf','25','-maxrate','1600k','-bufsize','1600k','-g','60',...(fps>30?['-r','30']:[]),'-pix_fmt','yuv420p','-threads','2','-c:a','aac','-b:a','96k','-movflags','+faststart','-map_metadata','-1',objectPath(playbackKey)],{timeout:20*60*1000,maxBuffer:4*1024*1024});
+  metadata.playbackProfile='mobile-v1';
   return {previewKey:poster,playbackKey,capturedText,capturedZone,metadata};
  }catch(error){await discardOutputs(j);throw error;}
 }
