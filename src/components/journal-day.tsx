@@ -24,10 +24,10 @@ export function JournalDay({day,index,total,remember}:{day:Day;index:number;tota
  }
  return <>
   <article className={`entry ${index%2?'right':''}`} aria-label={`${day.date}的回忆`}>
-   <div className="stamp"><span>{Number(day.date.slice(8))}日</span></div>
+   <div className={`stamp ${styles.dateStamp}`}><time dateTime={day.date}>{Number(day.date.slice(8))}日</time><span className={styles.ageTag}>又又 {ageOn(day.date)}</span></div>
    <div className={`memory panel ${styles.day}`}>
     {day.events.map(event=><span className={styles.anchor} id={`event-${event.id}`} key={event.id}/>)}
-    <div className="card-top"><small>{day.authors.join('、')}记录</small><span className="age">{ageOn(day.date)}</span></div>
+    <div className="card-top"><small>{day.authors.join('、')}记录</small></div>
     <div className={styles.counts} aria-label="当天素材数量">
      {day.imageCount>0&&<span><strong>{day.imageCount}</strong> 张照片</span>}
      {day.videoCount>0&&<span><strong>{day.videoCount}</strong> 段视频</span>}

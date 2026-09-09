@@ -27,3 +27,11 @@
 .viewerNav{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px}
 .viewerNav button{font-size:12px;padding:6px 12px;min-height:40px}
 @media(max-width:650px){.counts{gap:6px}.counts>span{padding:5px 8px;font-size:12px}.counts strong{font-size:20px}.grid{gap:6px}.viewerBody{padding:12px}.viewerNav{gap:8px}.viewerNav button{min-height:44px}.section{margin-top:16px}}
+
+.dateStamp time{display:block;white-space:nowrap}
+.dateStamp .ageTag{position:absolute;left:calc(100% - 8px);top:3px;display:inline-block;border-radius:99px;background:var(--soft);color:var(--green);font-size:11px;padding:3px 9px;line-height:1.7;white-space:nowrap}
+:global(.entry.right) .dateStamp .ageTag{left:auto;right:calc(100% - 8px)}
+@media(max-width:650px){
+ .dateStamp{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+ .dateStamp .ageTag,:global(.entry.right) .dateStamp .ageTag{position:static;font-size:11px}
+}
