@@ -12,8 +12,10 @@ export function MediaViewer({items,selectedId,date,onSelect,onClose,onRemember}:
  const index=items.findIndex(m=>m.id===selectedId),media=items[index];
  useEffect(()=>{
   const element=dialog.current!;const overflow=document.body.style.overflow;
+  const trigger=document.activeElement instanceof HTMLElement?document.activeElement:null;
+  const scrollY=window.scrollY;
   element.showModal();document.body.style.overflow='hidden';
-  return()=>{element.close();document.body.style.overflow=overflow;};
+  return()=>{element.close();document.body.style.overflow=overflow;trigger?.focus({preventScroll:true});window.scrollTo({top:scrollY,behavior:'instant'});};
  },[]);
  useEffect(()=>{if(dialog.current)dialog.current.scrollTop=0;},[selectedId]);
  return <dialog ref={dialog} className={`new-event-dialog ${styles.viewer}`} aria-label={`${date}的照片与视频详情`} onCancel={event=>{event.preventDefault();onClose();}} onClose={onClose}>
