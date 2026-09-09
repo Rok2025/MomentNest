@@ -1,0 +1,10 @@
+.day{min-width:0}
+.records{margin:18px 0}
+.record{min-width:0;scroll-margin-top:110px}
+.record+.record{border-top:1px solid var(--line);margin-top:22px;padding-top:22px}
+.record h2:first-child{margin-top:0}
+.recordBottom{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:10px;font-size:11px;color:var(--muted)}
+.recordBottom a{flex-shrink:0}
+.author{display:block;margin-bottom:10px;font-size:11px;color:var(--muted)}
+.remaining{font-size:12px;color:var(--muted);margin:10px 0 0}
+@media(max-width:650px){.record+.record{margin-top:18px;padding-top:18px}.recordBottom{font-size:10px;gap:8px}}

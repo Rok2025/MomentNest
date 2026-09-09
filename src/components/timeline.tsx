@@ -1,10 +1,10 @@
 'use client';
-import Link from 'next/link';
 import { useState,useRef,useEffect,useId } from 'react';
 import { Heatmap } from './heatmap';
 import { NewEventButton } from './new-event-dialog';
-import { Cover } from './media-gallery';
-import { ageOn,isCalendarDate } from '@/domain/dates';
+import { JournalDay } from './journal-day';
+import { journalDays } from '@/domain/journal-days';
+import { isCalendarDate } from '@/domain/dates';
 import { addDays,addMonths,type DayCount,type WindowState } from '@/domain/heatmap';
 import { mediaPending,reusePreview,type MediaRecord } from '@/domain/media';
 import { pollWhileVisible } from '@/domain/visible-poll';
@@ -45,6 +45,8 @@ export function Timeline({initial,days,today,memberId,initialRange,initialPages=
    setPage(current=>({...current,items:current.items.map(e=>{if(!byEvent.has(e.id))return e;const cover=byEvent.get(e.id);return {...e,cover:cover?reusePreview(e.cover,cover):null};})}));
   });
  },[pendingCovers,demoEvents]);
+ const groupedDays=journalDays(page.items);
+ const dayTotals=new Map(days.map(day=>[day.date,day.count]));
  const selectedMonth=range&&range.start.endsWith('-01')&&range.end===addDays(addMonths(range.start,1),-1)?range.start.slice(0,7):range?'custom':'';
  return <div className="journal-feed">
  <section id="journal-filters" className="journal-filter-panel" aria-label="筛选回忆" hidden={!filtersOpen}>
@@ -60,6 +62,6 @@ export function Timeline({initial,days,today,memberId,initialRange,initialPages=
  {range&&<div className="journal-range"><span>{range.start} — {range.end}</span><button type="button" onClick={()=>void load(undefined)} disabled={busy}>清除日期筛选 ×</button></div>}
  </section>
  {error&&<div className="notice" role="alert">{error} <button onClick={()=>void load(range)}>重试</button></div>}
- <div aria-busy={busy}>{!page.items.length?<section className="panel empty journal-empty"><div className="empty-mark" aria-hidden="true">✦</div><h2>{range?'这一段日子，还没有记录':'第一段回忆，从这里开始'}</h2><p>{range?'换个时间看看，或者补记这段日子的小事。':'第一次伸手、一个小小的笑容，或是今天的心情。'}</p><NewEventButton>记下一刻</NewEventButton></section>:<section className="timeline" aria-label="按发生日期倒序的回忆">{page.items.map((e,i)=>{const month=e.occurredOn.slice(0,7),heading=month!==page.items[i-1]?.occurredOn.slice(0,7);return <div key={e.id}>{heading&&<h2 className="chapter"><small>{month.slice(0,4)} 年</small>{Number(month.slice(5))} 月</h2>}<article id={`event-${e.id}`} className={`entry ${i%2?'right':''}`}><div className="stamp"><span>{Number(e.occurredOn.slice(8))}日</span></div><div className="memory panel"><div className="card-top"><small>{e.author}记录</small><span className="age">{ageOn(e.occurredOn)}</span></div>{e.title.trim()&&<h2><Link href={`/events/${e.id}`} onClick={()=>remember(e)}>{e.title}</Link></h2>}{e.mediaCount>0&&<Link className="cover-link" href={`/events/${e.id}`} onClick={()=>remember(e)}><Cover media={e.cover} priority={i===0}/></Link>}<p className="excerpt">{e.body||e.feeling}</p><div className="card-bottom"><span className="muted">{e.mediaCount?[e.imageCount?`${e.imageCount} 张照片`:'',e.videoCount?`${e.videoCount} 段视频`:''].filter(Boolean).join(' · '):'文字回忆'}</span><Link href={`/events/${e.id}`} onClick={()=>remember(e)}>慢慢回看 →</Link></div></div></article></div>;})}</section>}</div>
- <nav className="pager">{page.next&&<button disabled={busy} onClick={()=>void load(range,true)}>{busy?'正在翻开…':'更早的回忆 ↓'}</button>}</nav></div>;
+ <div aria-busy={busy}>{!page.items.length?<section className="panel empty journal-empty"><div className="empty-mark" aria-hidden="true">✦</div><h2>{range?'这一段日子，还没有记录':'第一段回忆，从这里开始'}</h2><p>{range?'换个时间看看，或者补记这段日子的小事。':'第一次伸手、一个小小的笑容，或是今天的心情。'}</p><NewEventButton>记下一刻</NewEventButton></section>:<section className="timeline" aria-label="按发生日期倒序的回忆">{groupedDays.map((day,i)=>{const month=day.date.slice(0,7),heading=month!==groupedDays[i-1]?.date.slice(0,7);return <div key={day.date}>{heading&&<h2 className="chapter"><small>{month.slice(0,4)} 年</small>{Number(month.slice(5))} 月</h2>}<JournalDay day={day} index={i} total={dayTotals.get(day.date)??day.events.length} remember={remember}/></div>;})}</section>}</div>
+ <nav className="pager">{page.next&&<button disabled={busy} onClick={()=>void load(range,true)}>{busy?'正在翻开…':page.next&&groupedDays.at(-1)?.date===page.next.date&&(dayTotals.get(page.next.date)??0)>(groupedDays.at(-1)?.events.length??0)?`继续加载 ${page.next.date} 的回忆 ↓`:'更早的回忆 ↓'}</button>}</nav></div>;
 }
