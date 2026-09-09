@@ -6,7 +6,7 @@ import type { MediaRecord } from '@/domain/media';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { saveEventAction } from '@/app/actions/events';
+import { submitEvent } from '@/domain/submit-event';
 import { BIRTHDAY,todayShanghai,validEventDate } from '@/domain/dates';
 import type { EventInput,EventRecord } from '@/domain/events';
 import { AuthForm } from './auth-form';
@@ -25,8 +25,8 @@ export function EventEditor({initial,today,memberId,media=[],preview=false,onClo
     saving.current=true;setBusy(true);onSavingChange?.(true);setMessage('');
     if(!attempt.current)attempt.current={requestKey:crypto.randomUUID(),...(initial?{id:initial.id,expectedVersion:version}:{}),occurredOn:date,title:'',body,feeling:'',uploadIds:uploads.map(u=>u.id!),uploadDates:uploads.map(u=>({id:u.id!,occurredOn:u.occurredOn??date})),...(initial?{coverMediaId:cover}:{})};
     try{
-      const result=await saveEventAction(attempt.current);
-      if(result.ok){if(onSaved)onSaved(result.id);else{router.push(`/?saved=1#event-${result.id}`);router.refresh();}return;}
+      const result=await submitEvent(attempt.current);
+      if(result.ok){if(onSaved)onSaved(result.id);else{router.push(`/?saved=1&save=${attempt.current.requestKey}#event-${result.id}`);}return;}
       setMessage(result.message);
       if(result.code==='UNAUTHENTICATED'){setNeedsLogin(true);}
       else if(result.code==='UNAVAILABLE'){setUncertain(true);}

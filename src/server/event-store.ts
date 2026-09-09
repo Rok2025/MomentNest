@@ -1,5 +1,6 @@
-import { lockUploads,bindUploads } from './media-store';
-import { createHash } from 'node:crypto';
+import { lockUploads } from './media-store';
+import { bindUploadGroups,type UploadGroup } from './save-media';
+import { createHash,randomUUID } from 'node:crypto';
 import { DomainError, inputSchema, type EventRecord, type Member } from '../domain/events';
 import { validEventDate, todayShanghai } from '../domain/dates';
 import type { DayCount } from '../domain/heatmap';
@@ -94,13 +95,17 @@ export async function saveEvent(transaction: Transaction, authId: string, raw: u
       if(result.rows.length!==1) throw new DomainError('UNAVAILABLE','家庭资料尚未初始化');
       id=String(result.rows[0].id);
     }
-    await bindUploads(db,m,id,uploads,offset);
-    for(const [day,files] of groups){
-      const extra=await db.query(`insert into momentnest.events(household_id,subject_id,author_member_id,updated_by,title,body,feeling,occurred_on,media_count)
-        select $1,s.id,$2,$2,'','','',$3,$4 from momentnest.subjects s where s.household_id=$1 returning id`,[m.householdId,m.id,day,files.length]);
-      if(extra.rows.length!==1)throw new DomainError('UNAVAILABLE','家庭资料尚未初始化');
-      await bindUploads(db,m,String(extra.rows[0].id),files,0);
+    const bindings:UploadGroup[]=[{eventId:id,uploads,offset}];
+    if(groups.size){
+      const extraGroups=Array.from(groups,([day,files])=>({id:randomUUID(),day,files}));
+      const extra=await db.query(`insert into momentnest.events(id,household_id,subject_id,author_member_id,updated_by,title,body,feeling,occurred_on,media_count)
+        select f.id,$1,s.id,$2,$2,'','','',f.day,f.count from momentnest.subjects s
+        cross join unnest($3::uuid[],$4::date[],$5::int[]) as f(id,day,count) where s.household_id=$1 returning id`,
+        [m.householdId,m.id,extraGroups.map(g=>g.id),extraGroups.map(g=>g.day),extraGroups.map(g=>g.files.length)]);
+      if(extra.rows.length!==extraGroups.length)throw new DomainError('UNAVAILABLE','家庭资料尚未初始化');
+      bindings.push(...extraGroups.map(g=>({eventId:g.id,uploads:g.files,offset:0})));
     }
+    await bindUploadGroups(db,m,bindings);
     await db.query('insert into momentnest.save_requests(household_id,member_id,request_key,payload_hash,event_id) values($1,$2,$3,$4,$5)',[m.householdId,m.id,input.requestKey,payloadHash,id]);
     return id;
   });
