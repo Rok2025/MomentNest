@@ -2,7 +2,7 @@
 import { useEffect,useState,useRef } from 'react';
 import { mediaPending,mediaStatusText,reusePreview,type MediaRecord,type PreviewLinks } from '@/domain/media';
 import { pollWhileVisible } from '@/domain/visible-poll';
-import { formatCaptureTime,sortByCaptureTime } from '@/domain/capture-date';
+import { formatCaptureTime } from '@/domain/capture-date';
 async function getLink(id:string,variant:string):Promise<{url:string;preview?:PreviewLinks}>{
  const r=await fetch(`/api/media/${id}/url`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({variant}),cache:'no-store'});
  if(!r.ok)throw Error('素材暂不可用，请重新登录或稍后重试');
@@ -73,7 +73,7 @@ export function MediaGallery({eventId,initial}:{eventId:string;initial:MediaReco
   });
  },[eventId,pending]);
  if(!media.length)return null;
- return <section className="gallery" aria-label="按拍摄时间升序的完整照片与视频"><h2>这一刻的画面 <small>{media.length} 份</small></h2>{sortByCaptureTime(media).map((m,i)=><MediaView key={m.id} media={m} priority={i===0} onRetry={()=>setMedia(current=>current.map(item=>item.id===m.id?{...item,status:'pending',errorCode:null}:item))}/>)}</section>;
+ return <section className="gallery" aria-label="完整照片与视频"><h2>这一刻的画面 <small>{media.length} 份</small></h2>{media.map((m,i)=><MediaView key={m.id} media={m} priority={i===0} onRetry={()=>setMedia(current=>current.map(item=>item.id===m.id?{...item,status:'pending',errorCode:null}:item))}/>)}</section>;
 }
 export function Cover({media,priority=false}:{media?:MediaRecord|null;priority?:boolean}){
  return media?<MediaView media={media} compact priority={priority}/>:null;
