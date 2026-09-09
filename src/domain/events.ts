@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { validEventDate, todayShanghai } from './dates';
+import type { MediaRecord } from './media';
 export const uuid = z.string().uuid();
 export const inputSchema = z.object({
   requestKey: uuid,
@@ -25,7 +26,7 @@ export function parseEventInput(raw: unknown, today = todayShanghai()): EventInp
   return input;
 }
 export type Member = { id: string; householdId: string; label: '爸爸' | '妈妈' };
-export type EventRecord = { id: string; title: string; body: string; feeling: string; occurredOn: string; createdAt: string; updatedAt: string; author: string; editor: string; version: number; mediaCount:number; imageCount:number; videoCount:number; coverMediaId:string|null };
+export type EventRecord = { id: string; title: string; body: string; feeling: string; occurredOn: string; createdAt: string; updatedAt: string; author: string; editor: string; version: number; mediaCount:number; imageCount:number; videoCount:number; coverMediaId:string|null;cover?:MediaRecord|null };
 export type ErrorCode = 'VALIDATION' | 'UNAUTHENTICATED' | 'FORBIDDEN' | 'CONFLICT' | 'NOT_FOUND' | 'UNAVAILABLE';
 export class DomainError extends Error {
   constructor(public code: ErrorCode, message: string) { super(message); }

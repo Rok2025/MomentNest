@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { DomainError,type Member } from '../domain/events';
 import { fileKind,fileProblem,MAX_FILES,type MediaRecord } from '../domain/media';
 import { memberFor,type Queryable,type Transaction } from './event-store';
+import { previewLinks } from './media-preview';
+import { coverJoin } from './media-query';
 export async function authorizeUploads(tx:Transaction,authId:string,files:{name:string;size:number}[]){
  if(!files.length||files.length>MAX_FILES)throw new DomainError('VALIDATION','每批请选择1至20份素材');
  for(const file of files){const problem=fileProblem(file.name,file.size);if(problem||file.name.length>255)throw new DomainError('VALIDATION',problem||'文件名过长');}
@@ -52,8 +54,14 @@ export async function bindUploads(db:Queryable,m:Member,eventId:string,uploads:R
   await db.query('insert into momentnest.media_jobs(media_id) values($1)',[id]);await db.query("update momentnest.upload_sessions set state='bound',event_id=$1 where id=$2",[eventId,u.id]);
  }
 }
-export function mediaRecord(r:Record<string,unknown>):MediaRecord{return {id:String(r.id),eventId:String(r.event_id),filename:String(r.filename),kind:r.kind as MediaRecord['kind'],mime:String(r.mime),size:Number(r.size),position:Number(r.position),status:r.status as MediaRecord['status'],capturedText:r.captured_text?String(r.captured_text):null,capturedZone:r.captured_zone?String(r.captured_zone):null,errorCode:r.error_code?String(r.error_code):null,hasPreview:!!r.preview_key,hasPlayback:!!r.playback_key};}
-export async function listMedia(db:Queryable,authId:string,eventId:string){const m=await memberFor(db,authId);return (await db.query('select * from momentnest.media where household_id=$1 and event_id=$2 order by position',[m.householdId,eventId])).rows.map(mediaRecord);}
+export function mediaRecord(r:Record<string,unknown>,withPreviewLinks=false):MediaRecord{return {id:String(r.id),eventId:String(r.event_id),filename:String(r.filename),kind:r.kind as MediaRecord['kind'],mime:String(r.mime),size:Number(r.size),position:Number(r.position),status:r.status as MediaRecord['status'],capturedText:r.captured_text?String(r.captured_text):null,capturedZone:r.captured_zone?String(r.captured_zone):null,errorCode:r.error_code?String(r.error_code):null,hasPreview:!!r.preview_key,hasPlayback:!!r.playback_key,...(withPreviewLinks?{preview:previewLinks(r)}:{})};}
+export async function listMedia(db:Queryable,authId:string,eventId:string,withPreviewLinks=false){const m=await memberFor(db,authId);return (await db.query('select * from momentnest.media where household_id=$1 and event_id=$2 order by position',[m.householdId,eventId])).rows.map(r=>mediaRecord(r,withPreviewLinks));}
+// Used by the feed query and by one batched refresh for unfinished covers.
+export async function listEventCovers(db:Queryable,authId:string,eventIds:string[],withPreviewLinks=false){
+ const m=await memberFor(db,authId);
+ const {rows}=await db.query(`select e.id,to_jsonb(cover) as cover from momentnest.events e ${coverJoin} where e.household_id=$1 and e.id=any($2::uuid[])`,[m.householdId,eventIds]);
+ return rows.map(r=>({eventId:String(r.id),cover:r.cover?mediaRecord(r.cover as Record<string,unknown>,withPreviewLinks):null}));
+}
 export async function ownMedia(db:Queryable,authId:string,id:string){const m=await memberFor(db,authId);const r=await db.query('select * from momentnest.media where household_id=$1 and id=$2',[m.householdId,id]);if(!r.rows[0])throw new DomainError('NOT_FOUND','找不到这份素材');return r.rows[0];}
 export async function retryMedia(tx:Transaction,authId:string,id:string){return tx(async db=>{
  const media=await ownMedia(db,authId,id);const r=await db.query("update momentnest.media_jobs set state='pending',attempts=0,generation=generation+1,available_at=clock_timestamp(),claim_token=null,lease_until=null where media_id=$1 and state='failed' returning media_id",[media.id]);

@@ -1,16 +1,27 @@
 import { randomUUID } from 'node:crypto';
 import type { Transaction,Queryable } from './event-store';
-export type Job={mediaId:string;token:string;generation:number;attempts:number;key:string;kind:string;sha256:string};
-export async function claimJob(tx:Transaction):Promise<Job|null>{return tx(async db=>{
- const {rows}=await db.query("select j.*,m.object_key,m.kind,m.sha256 from momentnest.media_jobs j join momentnest.media m on m.id=j.media_id where (j.state='pending' and j.available_at<=clock_timestamp()) or (j.state='processing' and j.lease_until<clock_timestamp()) order by j.available_at limit 1 for update of j skip locked");
+export type Job={mediaId:string;token:string;generation:number;attempts:number;key:string;kind:string;sha256:string;previewKey?:string;metadata?:Record<string,unknown>};
+export type MediaLane='preview'|'video';
+export async function claimJob(tx:Transaction,lane?:MediaLane):Promise<Job|null>{return tx(async db=>{
+ const filter=lane==='preview'?"and (m.kind='image' or m.preview_key is null)":lane==='video'?"and m.kind='video' and m.preview_key is not null":'';
+ const {rows}=await db.query(`select j.*,m.object_key,m.kind,m.sha256,m.preview_key,m.metadata from momentnest.media_jobs j join momentnest.media m on m.id=j.media_id where ((j.state='pending' and j.available_at<=clock_timestamp()) or (j.state='processing' and j.lease_until<clock_timestamp())) ${filter} order by j.available_at,j.media_id limit 1 for update of j skip locked`);
  const r=rows[0];if(!r)return null;const token=randomUUID();
  // An expired last attempt becomes visibly failed instead of retrying forever.
  if(Number(r.attempts)>=3){await db.query("update momentnest.media_jobs set state='failed',claim_token=null where media_id=$1",[r.media_id]);await db.query("update momentnest.media set status='failed',error_code='PROCESSING_FAILED' where id=$1",[r.media_id]);return null;}
  await db.query("update momentnest.media_jobs set state='processing',claim_token=$1,attempts=attempts+1,lease_until=clock_timestamp()+interval '90 seconds',updated_at=clock_timestamp() where media_id=$2",[token,r.media_id]);await db.query("update momentnest.media set status='processing',error_code=null where id=$1",[r.media_id]);
- return {mediaId:String(r.media_id),token,generation:Number(r.generation),attempts:Number(r.attempts)+1,key:String(r.object_key),kind:String(r.kind),sha256:String(r.sha256)};
+ return {mediaId:String(r.media_id),token,generation:Number(r.generation),attempts:Number(r.attempts)+1,key:String(r.object_key),kind:String(r.kind),sha256:String(r.sha256),previewKey:r.preview_key?String(r.preview_key):undefined,metadata:(r.metadata||{}) as Record<string,unknown>};
 });}
 export async function heartbeat(db:Queryable,j:Job){const r=await db.query("update momentnest.media_jobs set lease_until=clock_timestamp()+interval '90 seconds' where media_id=$1 and claim_token=$2 and generation=$3 and state='processing' returning media_id",[j.mediaId,j.token,j.generation]);return r.rows.length===1;}
 export type Processed={previewKey:string;playbackKey:string|null;capturedText:string|null;capturedZone:string|null;metadata:Record<string,unknown>};
+// Publish the poster before encoding. The next lease belongs to the video lane.
+export async function finishPreviewJob(tx:Transaction,j:Job,result:Processed){return tx(async db=>{
+ if(j.kind!=='video'||result.playbackKey)throw Error('INVALID_PREVIEW_STAGE');
+ const r=await db.query("select media_id from momentnest.media_jobs where media_id=$1 and claim_token=$2 and generation=$3 and state='processing' and lease_until>clock_timestamp() for update",[j.mediaId,j.token,j.generation]);
+ if(!r.rows.length)return false;
+ await db.query("update momentnest.media set status='pending',preview_key=$1,captured_text=$2,captured_zone=$3,metadata=$4,error_code=null where id=$5",[result.previewKey,result.capturedText,result.capturedZone,JSON.stringify(result.metadata),j.mediaId]);
+ await db.query("update momentnest.media_jobs set state='pending',attempts=0,available_at=clock_timestamp(),lease_until=null,claim_token=null,updated_at=clock_timestamp() where media_id=$1",[j.mediaId]);
+ return true;
+});}
 export async function finishJob(tx:Transaction,j:Job,result:Processed|null){return tx(async db=>{
  const r=await db.query("select media_id from momentnest.media_jobs where media_id=$1 and claim_token=$2 and generation=$3 and state='processing' and lease_until>clock_timestamp() for update",[j.mediaId,j.token,j.generation]);if(!r.rows.length)return false;
  if(result){await db.query("update momentnest.media set status='ready',preview_key=$1,playback_key=$2,captured_text=$3,captured_zone=$4,metadata=$5,error_code=null where id=$6",[result.previewKey,result.playbackKey,result.capturedText,result.capturedZone,JSON.stringify(result.metadata),j.mediaId]);await db.query("update momentnest.media_jobs set state='ready',lease_until=null,claim_token=null,updated_at=clock_timestamp() where media_id=$1",[j.mediaId]);}

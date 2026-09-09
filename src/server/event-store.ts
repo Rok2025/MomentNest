@@ -1,4 +1,5 @@
-import { lockUploads } from './media-store';
+import { coverJoin } from './media-query';
+import { lockUploads,mediaRecord } from './media-store';
 import { bindUploadGroups,type UploadGroup } from './save-media';
 import { createHash,randomUUID } from 'node:crypto';
 import { DomainError, inputSchema, type EventRecord, type Member } from '../domain/events';
@@ -11,10 +12,10 @@ export async function memberFor(db: Queryable, authId: string): Promise<Member> 
   if (rows.length !== 1) throw new DomainError('FORBIDDEN', '此账号尚未加入家庭，或已停用');
   return { id: String(rows[0].id), householdId: String(rows[0].household_id), label: rows[0].label as Member['label'] };
 }
-const selection = `select e.id,e.title,e.body,e.feeling,e.occurred_on::text as occurred_on,e.created_at,e.updated_at,e.version,e.media_count,e.cover_media_id,(select count(*)::int from momentnest.media m where m.household_id=e.household_id and m.event_id=e.id and m.kind='image') as image_count,(select count(*)::int from momentnest.media m where m.household_id=e.household_id and m.event_id=e.id and m.kind='video') as video_count,a.label as author,u.label as editor
- from momentnest.events e join momentnest.members a on a.id=e.author_member_id join momentnest.members u on u.id=e.updated_by`;
-function record(row: Record<string, unknown>): EventRecord {
-  return { id:String(row.id),title:String(row.title),body:String(row.body),feeling:String(row.feeling),occurredOn:String(row.occurred_on),createdAt:new Date(String(row.created_at)).toISOString(),updatedAt:new Date(String(row.updated_at)).toISOString(),author:String(row.author),editor:String(row.editor),version:Number(row.version),mediaCount:Number(row.media_count||0),imageCount:Number(row.image_count||0),videoCount:Number(row.video_count||0),coverMediaId:row.cover_media_id?String(row.cover_media_id):null };
+const selection = `select e.id,e.title,e.body,e.feeling,e.occurred_on::text as occurred_on,e.created_at,e.updated_at,e.version,e.media_count,e.cover_media_id,to_jsonb(cover) as cover,(select count(*)::int from momentnest.media m where m.household_id=e.household_id and m.event_id=e.id and m.kind='image') as image_count,(select count(*)::int from momentnest.media m where m.household_id=e.household_id and m.event_id=e.id and m.kind='video') as video_count,a.label as author,u.label as editor
+ from momentnest.events e join momentnest.members a on a.id=e.author_member_id join momentnest.members u on u.id=e.updated_by ${coverJoin}`;
+function record(row: Record<string, unknown>, withPreviewLinks=false): EventRecord {
+  return { id:String(row.id),title:String(row.title),body:String(row.body),feeling:String(row.feeling),occurredOn:String(row.occurred_on),createdAt:new Date(String(row.created_at)).toISOString(),updatedAt:new Date(String(row.updated_at)).toISOString(),author:String(row.author),editor:String(row.editor),version:Number(row.version),mediaCount:Number(row.media_count||0),imageCount:Number(row.image_count||0),videoCount:Number(row.video_count||0),coverMediaId:row.cover_media_id?String(row.cover_media_id):null,cover:row.cover?mediaRecord(row.cover as Record<string,unknown>,withPreviewLinks):null };
 }
 export async function getEvent(db: Queryable, authId: string, id: string): Promise<EventRecord> {
   const m = await memberFor(db, authId);
@@ -23,17 +24,17 @@ export async function getEvent(db: Queryable, authId: string, id: string): Promi
   return record(rows[0]);
 }
 export type Cursor = { date: string; createdAt: string; id: string };
-export async function listEvents(db: Queryable, authId: string, cursor?: Cursor, range?: {start:string;end:string}) {
+export async function listEvents(db: Queryable, authId: string, cursor?: Cursor, range?: {start:string;end:string},withPreviewLinks=false) {
   const m = await memberFor(db,authId);
-  return listForMember(db,m,cursor,range);
+  return listForMember(db,m,cursor,range,withPreviewLinks);
 }
-async function listForMember(db: Queryable, m: Member, cursor?: Cursor, range?: {start:string;end:string}) {
+async function listForMember(db: Queryable, m: Member, cursor?: Cursor, range?: {start:string;end:string},withPreviewLinks=false) {
   const values: unknown[] = [m.householdId];
   let after = '';
   if(cursor) { after=' and (e.occurred_on,e.created_at,e.id)<($2::date,$3::timestamptz,$4::uuid)'; values.push(cursor.date,cursor.createdAt,cursor.id); }
   if(range){const n=values.length;values.push(range.start,range.end);after+=` and e.occurred_on between $${n+1}::date and $${n+2}::date`;}
   const { rows }=await db.query(`${selection} where e.household_id=$1${after} order by e.occurred_on desc,e.created_at desc,e.id desc limit 21`,values);
-  const items=rows.slice(0,20).map(record),last=items.at(-1);
+  const items=rows.slice(0,20).map(r=>record(r,withPreviewLinks)),last=items.at(-1);
   return { items, next: rows.length>20 && last ? { date:last.occurredOn,createdAt:last.createdAt,id:last.id } : null };
 }
 export async function heatmapCounts(db:Queryable,authId:string){
@@ -44,12 +45,12 @@ async function countsForMember(db:Queryable,m:Member):Promise<DayCount[]>{
   return rows.map(r=>({date:String(r.date),count:Number(r.count)}));
 }
 // Share one live membership check only within this read, never across requests.
-export async function homeData(db:Queryable,authId:string,range?:{start:string;end:string},pages=1){
+export async function homeData(db:Queryable,authId:string,range?:{start:string;end:string},pages=1,withPreviewLinks=false){
   const member=await memberFor(db,authId);
-  const [first,days]=await Promise.all([listForMember(db,member,undefined,range),countsForMember(db,member)]);
+  const [first,days]=await Promise.all([listForMember(db,member,undefined,range,withPreviewLinks),countsForMember(db,member)]);
   let page=first;
   for(let i=1;i<Math.min(50,pages)&&page.next;i++){
-    const next=await listForMember(db,member,page.next,range);
+    const next=await listForMember(db,member,page.next,range,withPreviewLinks);
     page={items:[...page.items,...next.items],next:next.next};
   }
   return {member,page,days};

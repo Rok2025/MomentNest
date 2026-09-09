@@ -30,7 +30,7 @@ async function HomeContent({searchParams,authId}:HomeProps&{authId:string}){
  const q=await searchParams,today=todayShanghai(),range=q.start&&q.end&&isCalendarDate(q.start)&&isCalendarDate(q.end)&&q.start<=q.end?{start:q.start,end:q.end}:undefined;
  const pages=Math.max(1,Math.min(50,Number.parseInt(q.pages||'1')||1));
  let data:Awaited<ReturnType<typeof homeData>>;
- try{data=await timed('home.data',async()=>{await prepareDatabase();return homeData(database(),authId,range,pages);});}catch(error){
+ try{data=await timed('home.data',async()=>{await prepareDatabase();return homeData(database(),authId,range,pages,true);});}catch(error){
   return <Unavailable message={error instanceof DomainError&&error.code==='FORBIDDEN'?'此账号尚未加入家庭，或已停用。':'暂时读不到回忆，请稍后再试。'}/>;
  }
  const {member,page,days}=data;
