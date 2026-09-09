@@ -6,13 +6,14 @@ import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { createHash,randomUUID } from 'node:crypto';
 import { verifyTicket,objectPath,detectMime,storageRoot } from './local';
+import {resumeState,chunkRange,receiveChunk,finalizeChunks} from './resumable';
 export function storageServer(){
  const active=new Set<string>();let inFlight=0;
  const server=createServer(async(req,res)=>{
   const allowed=process.env.APP_URL||'http://localhost:3000';
   res.setHeader('Cache-Control','private, no-store');res.setHeader('X-Content-Type-Options','nosniff');
-  if(req.headers.origin===allowed){res.setHeader('Access-Control-Allow-Origin',allowed);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Expose-Headers','Content-Range,Content-Length,Accept-Ranges');}
-  if(req.method==='OPTIONS'){if(req.headers.origin!==allowed){res.writeHead(403).end();return;}res.setHeader('Access-Control-Allow-Methods','GET, PUT, OPTIONS');res.setHeader('Access-Control-Allow-Headers','Content-Type,Range');res.writeHead(204).end();return;}
+  if(req.headers.origin===allowed){res.setHeader('Access-Control-Allow-Origin',allowed);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Expose-Headers','Content-Range,Content-Length,Accept-Ranges,Upload-Offset,Upload-Complete');}
+  if(req.method==='OPTIONS'){if(req.headers.origin!==allowed){res.writeHead(403).end();return;}res.setHeader('Access-Control-Allow-Methods','GET, HEAD, PUT, POST, OPTIONS');res.setHeader('Access-Control-Allow-Headers','Content-Type,Range,Content-Range');res.writeHead(204).end();return;}
   let temp:string|undefined,key:string|undefined;
   try{
    const url=new URL(req.url||'/',allowed);
@@ -21,6 +22,26 @@ export function storageServer(){
    }
    if(url.pathname!=='/object')throw Error('NOT_FOUND');
    const t=verifyTicket(url.searchParams.get('ticket')||''),path=objectPath(t.key);
+   if(t.operation==='put'&&(req.method==='HEAD'||req.method==='POST'||(req.method==='PUT'&&req.headers['content-range']))){
+    if(req.headers.origin!==allowed||!t.size||!Number.isSafeInteger(t.size)||t.size>524288000||t.size<=0)throw Error('FORBIDDEN');
+    if(active.has(t.key)||inFlight>=3){res.writeHead(409).end();return;}
+    key=t.key;active.add(key);inFlight++;
+    const state=await resumeState(path,t.size);
+    res.setHeader('Upload-Offset',state.offset);res.setHeader('Upload-Complete',state.complete?'1':'0');
+    if(req.method==='HEAD'){res.writeHead(200).end();return;}
+    if(state.complete){res.writeHead(409).end();return;}
+    await mkdir(dirname(path),{recursive:true,mode:0o700});
+    const disk=await statfs(storageRoot());if(disk.bavail*disk.bsize<t.size*2+1073741824)throw Error('DISK_FULL');
+    let offset=state.offset;
+    if(req.method==='PUT'){
+     const range=chunkRange(String(req.headers['content-range']),t.size,Number(req.headers['content-length']));
+     if(range.start!==offset){res.writeHead(409).end();return;}
+     await receiveChunk(req,path,t,range.start,range.end);offset=range.end+1;
+    }else if(Number(req.headers['content-length']||0)!==0)throw Error('WRONG_SIZE');
+    if(offset===t.size){await finalizeChunks(path,t);res.setHeader('Upload-Complete','1');}
+    else if(req.method==='POST')throw Error('INCOMPLETE_UPLOAD');
+    res.setHeader('Upload-Offset',offset);if(offset===t.size)res.setHeader('Content-Length','0');res.writeHead(offset===t.size?201:204).end();return;
+   }
    if(req.method==='PUT'&&t.operation==='put'){
     if(req.headers.origin!==allowed)throw Error('FORBIDDEN');
     if(!t.size||t.size>524288000||t.size<=0||Number(req.headers['content-length'])!==t.size)throw Error('WRONG_SIZE');
