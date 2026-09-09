@@ -66,7 +66,14 @@ export async function saveEvent(transaction: Transaction, authId: string, raw: u
       return String(prior.rows[0].event_id);
     }
     if(!validEventDate(input.occurredOn,today)) throw new DomainError('VALIDATION','发生日期须在2025年4月17日至北京时间今天之间');
-    const uploads=await lockUploads(db,m,input.uploadIds);
+    if(input.uploadDates?.some(d=>!validEventDate(d.occurredOn,today)))throw new DomainError('VALIDATION','请检查每份素材的日期');
+    const allUploads=await lockUploads(db,m,input.uploadIds);
+    const groups=new Map<string,Record<string,unknown>[]>();
+    for(const upload of allUploads){const day=input.uploadDates?.find(d=>d.id===upload.id)?.occurredOn||input.occurredOn;groups.set(day,[...(groups.get(day)||[]),upload]);}
+    // Text belongs only to the selected day. Edits retain the original record and version check.
+    const primaryDay=input.id||input.body||input.feeling?input.occurredOn:groups.has(input.occurredOn)?input.occurredOn:groups.keys().next().value||input.occurredOn;
+    const uploads=groups.get(primaryDay)||[];
+    groups.delete(primaryDay);
     let offset=0;let id: string;
     if(input.id) {
       const current=await db.query('select media_count from momentnest.events where household_id=$1 and id=$2 for update',[m.householdId,input.id]);
@@ -83,11 +90,17 @@ export async function saveEvent(transaction: Transaction, authId: string, raw: u
       id=String(result.rows[0].id);
     } else {
       const result=await db.query(`insert into momentnest.events(household_id,subject_id,author_member_id,updated_by,title,body,feeling,occurred_on,media_count)
-       select $1,s.id,$2,$2,$3,$4,$5,$6,$7 from momentnest.subjects s where s.household_id=$1 returning id`,[m.householdId,m.id,input.title,input.body,input.feeling,input.occurredOn,uploads.length]);
+       select $1,s.id,$2,$2,$3,$4,$5,$6,$7 from momentnest.subjects s where s.household_id=$1 returning id`,[m.householdId,m.id,input.title,input.body,input.feeling,primaryDay,uploads.length]);
       if(result.rows.length!==1) throw new DomainError('UNAVAILABLE','家庭资料尚未初始化');
       id=String(result.rows[0].id);
     }
     await bindUploads(db,m,id,uploads,offset);
+    for(const [day,files] of groups){
+      const extra=await db.query(`insert into momentnest.events(household_id,subject_id,author_member_id,updated_by,title,body,feeling,occurred_on,media_count)
+        select $1,s.id,$2,$2,'','','',$3,$4 from momentnest.subjects s where s.household_id=$1 returning id`,[m.householdId,m.id,day,files.length]);
+      if(extra.rows.length!==1)throw new DomainError('UNAVAILABLE','家庭资料尚未初始化');
+      await bindUploads(db,m,String(extra.rows[0].id),files,0);
+    }
     await db.query('insert into momentnest.save_requests(household_id,member_id,request_key,payload_hash,event_id) values($1,$2,$3,$4,$5)',[m.householdId,m.id,input.requestKey,payloadHash,id]);
     return id;
   });

@@ -2,6 +2,7 @@
 const config = {
   poweredByHeader: false,
   devIndicators: false,
+  serverExternalPackages: ['exifr'],
   outputFileTracingExcludes: {'/*':['./.private/**/*','./.env*','./work/**/*']},
   async headers() {
     return [{ source: '/:path*', headers: [

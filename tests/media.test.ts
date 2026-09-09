@@ -14,6 +14,31 @@ beforeAll(async()=>{db=new PGlite();await db.exec('create role anon;create role 
 afterAll(async()=>{await db.close();});
 describe('media save and job contracts',()=>{
  it('纯媒体原件验证、绑定、入队与计数同事务，同键重试只一条',async()=>{const id=await upload(),r=raw([id]);const event=await saveEvent(tx,father,r);expect(await saveEvent(tx,father,r)).toBe(event);expect(await getEvent(db,father,event)).toMatchObject({mediaCount:1,imageCount:1,videoCount:0});expect((await listMedia(db,mother,event)).length).toBe(1);expect((await heatmapCounts(db,father)).find(d=>d.date==='2025-06-01')?.count).toBe(1);expect((await db.query('select state from momentnest.upload_sessions where id=$1',[id])).rows[0]).toEqual({state:'bound'});});
+ it('跨天上传原子归档，文字只归选定日期，重试不重复',async()=>{
+  const ids=[await upload(),await upload(),await upload()];
+  const input={...raw(ids),body:'今天的文字',occurredOn:'2025-07-03',uploadDates:[{id:ids[0],occurredOn:'2025-07-01'},{id:ids[1],occurredOn:'2025-07-01'},{id:ids[2],occurredOn:'2025-07-02'}]};
+  const id=await saveEvent(tx,father,input);expect(await saveEvent(tx,father,input)).toBe(id);
+  expect(await getEvent(db,mother,id)).toMatchObject({occurredOn:'2025-07-03',body:'今天的文字',mediaCount:0});
+  const events=(await listEvents(db,father,undefined,{start:'2025-07-01',end:'2025-07-03'})).items;
+  expect(events).toHaveLength(3);expect(events.find(e=>e.occurredOn==='2025-07-01')).toMatchObject({body:'',mediaCount:2});
+  expect(events.find(e=>e.occurredOn==='2025-07-02')).toMatchObject({body:'',mediaCount:1});
+  await expect(saveEvent(tx,father,{...input,uploadDates:input.uploadDates.map(d=>({...d,occurredOn:'2025-07-04'}))})).rejects.toMatchObject({code:'CONFLICT'});
+ });
+ it('纯媒体不创建空的所选日期，日期无效或与上传不匹配时整体拒绝',async()=>{
+  const id=await upload();const input={...raw([id]),uploadDates:[{id,occurredOn:'2025-07-05'}]};
+  await expect(saveEvent(tx,father,{...input,uploadDates:[{id,occurredOn:'2025-02-30'}]})).rejects.toMatchObject({code:'VALIDATION'});
+  await expect(saveEvent(tx,father,{...input,uploadDates:[]})).rejects.toThrow();
+  const event=await saveEvent(tx,father,input);expect(await getEvent(db,father,event)).toMatchObject({occurredOn:'2025-07-05',mediaCount:1,body:''});
+ });
+ it('跨天保存失败整批回滚，编辑旧记录可追加异日媒体且仍校验版本',async()=>{
+  const ids=[await upload(),await upload()];const input={...raw(ids),uploadDates:[{id:ids[0],occurredOn:'2025-07-06'},{id:ids[1],occurredOn:'2025-07-07'}]};
+  const bad:Transaction=fn=>db.transaction(async t=>{await fn(t);throw Error('rollback batch');});
+  await expect(saveEvent(bad,father,input)).rejects.toThrow('rollback batch');
+  expect((await db.query<{state:string}>('select state from momentnest.upload_sessions where id=any($1::uuid[])',[ids])).rows.every(r=>r.state==='verified')).toBe(true);
+  const original=await saveEvent(tx,father,{...raw(),body:'旧记录'});
+  const edit={...input,id:original,expectedVersion:1,body:'补充后的文字'};await saveEvent(tx,father,edit);
+  expect(await getEvent(db,father,original)).toMatchObject({body:'补充后的文字',version:2,mediaCount:0});
+ });
  it('不接受未验证、取消、过期、重复或他人上传',async()=>{const u=await authorizeUpload(tx,father,{name:'test.mp4',size:200});await expect(saveEvent(tx,father,raw([String(u.id)]))).rejects.toMatchObject({code:'VALIDATION'});const id=await upload();await expect(saveEvent(tx,mother,raw([id]))).rejects.toMatchObject({code:'VALIDATION'});await expect(saveEvent(tx,father,raw([id,id]))).rejects.toMatchObject({code:'VALIDATION'});await cancelUpload(tx,father,id);await expect(saveEvent(tx,father,raw([id]))).rejects.toMatchObject({code:'VALIDATION'});const expired=await upload();await db.query("update momentnest.upload_sessions set expires_at=clock_timestamp()-interval '1 second' where id=$1",[expired]);await expect(saveEvent(tx,father,raw([expired]))).rejects.toMatchObject({code:'VALIDATION'});});
  it('实际内容/大小必须与授权一致，拒绝超限和空文件',async()=>{await expect(authorizeUpload(tx,father,{name:'x.jpg',size:51*1024*1024})).rejects.toMatchObject({code:'VALIDATION'});await expect(authorizeUpload(tx,father,{name:'x.mp4',size:0})).rejects.toMatchObject({code:'VALIDATION'});const u=await authorizeUpload(tx,father,{name:'x.jpg',size:42});await expect(completeUpload(tx,father,String(u.id),{size:43,kind:'video',mime:'video/mp4',sha256:'a'.repeat(64)})).rejects.toMatchObject({code:'VALIDATION'});});
  it('保存回滚不留下媒体或任务，verified素材可重新提交',async()=>{const u=await upload();const bad:Transaction=fn=>db.transaction(async t=>{await fn(t);throw Error('connection dropped before commit');});await expect(saveEvent(bad,father,raw([u]))).rejects.toThrow();expect((await db.query('select state from momentnest.upload_sessions where id=$1',[u])).rows[0]).toEqual({state:'verified'});expect((await db.query('select id from momentnest.media where upload_session_id=$1',[u])).rows).toHaveLength(0);await saveEvent(tx,father,raw([u]));});
