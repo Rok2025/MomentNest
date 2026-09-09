@@ -33,16 +33,16 @@ export function Timeline({initial,days,today,memberId,initialRange,initialPages=
   try{if(demoEvents){const filtered=demoEvents.filter(e=>!nextRange||(e.occurredOn>=nextRange.start&&e.occurredOn<=nextRange.end));setPage({items:filtered,next:null});setRange(nextRange);setPages(1);return;}const r=await fetch('/api/events?'+q,{signal:controller.signal,cache:'no-store'});if(!r.ok)throw Error(r.status===401?'登录已过期，请重新登录':'暂时无法读取回忆，请重试');const result=await r.json();setPage({items:more?[...page.items,...result.items]:result.items,next:result.next});setRange(nextRange);const count=more?pages+1:1;setPages(count);const u=new URLSearchParams(nextRange||{});if(count>1)u.set('pages',String(count));history.replaceState(null,'','/'+(u.size?'?'+u:''));}
   catch(e){if(!controller.signal.aborted)setError((e as Error).message);}finally{if(!controller.signal.aborted)setBusy(false);}
  }
- const pendingCovers=page.items.filter(e=>e.cover&&mediaPending(e.cover)).map(e=>e.id).slice(0,100).join(',');
+ const pendingCovers=page.items.filter(e=>(e.media??(e.cover?[e.cover]:[])).some(mediaPending)).map(e=>e.id).slice(0,100).join(',');
  useEffect(()=>{
   if(!pendingCovers||demoEvents)return;
   return pollWhileVisible(async signal=>{
    const r=await fetch('/api/media/covers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({eventIds:pendingCovers.split(',')}),cache:'no-store',signal});
    if(!r.ok)return;
-   const covers:{eventId:string;cover:MediaRecord|null}[]=await r.json();
+   const covers:{eventId:string;cover:MediaRecord|null;media:MediaRecord[]}[]=await r.json();
    if(signal.aborted)return;
-   const byEvent=new Map(covers.map(item=>[item.eventId,item.cover]));
-   setPage(current=>({...current,items:current.items.map(e=>{if(!byEvent.has(e.id))return e;const cover=byEvent.get(e.id);return {...e,cover:cover?reusePreview(e.cover,cover):null};})}));
+   const byEvent=new Map(covers.map(item=>[item.eventId,item]));
+   setPage(current=>({...current,items:current.items.map(e=>{if(!byEvent.has(e.id))return e;const update=byEvent.get(e.id)!;const previous=new Map((e.media??[]).map(m=>[m.id,m]));return {...e,cover:update.cover?reusePreview(e.cover,update.cover):null,media:update.media.map(m=>reusePreview(previous.get(m.id),m))};})}));
   });
  },[pendingCovers,demoEvents]);
  const groupedDays=journalDays(page.items);

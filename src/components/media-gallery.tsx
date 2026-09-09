@@ -9,7 +9,7 @@ async function getLink(id:string,variant:string):Promise<{url:string;preview?:Pr
  if(!r.ok)throw Error('素材暂不可用，请重新登录或稍后重试');
  return r.json();
 }
-export function MediaView({media,compact=false,priority=false,onRetry}:{media:MediaRecord;compact?:boolean;priority?:boolean;onRetry?:()=>void}){
+export function MediaView({media,compact=false,priority=false,thumbnail=false,onRetry}:{media:MediaRecord;compact?:boolean;priority?:boolean;thumbnail?:boolean;onRetry?:()=>void}){
  const [renewed,setRenewed]=useState<{source:string|undefined;links:PreviewLinks}|null>(null);
  const preview=renewed&&renewed.source===media.preview?.url?renewed.links:media.preview;
  const [playback,setPlayback]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
@@ -40,7 +40,7 @@ export function MediaView({media,compact=false,priority=false,onRetry}:{media:Me
    preview?
     // Private, pre-generated variants use browser srcSet; do not pass signed URLs through a public image optimizer.
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={preview.url} srcSet={preview.srcSet} sizes={compact?'(max-width: 650px) calc(100vw - 104px), (max-width: 1120px) 40vw, 450px':'(max-width: 650px) calc(100vw - 74px), 760px'} width={preview.width} height={preview.height} alt={compact?'回忆封面':media.filename} loading={priority?'eager':'lazy'} fetchPriority={priority?'high':'auto'} decoding="async" onError={imageError}/>:
+    <img src={preview.url} srcSet={preview.srcSet} sizes={thumbnail?'(max-width: 650px) 28vw, 150px':compact?'(max-width: 650px) calc(100vw - 104px), (max-width: 1120px) 40vw, 450px':'(max-width: 650px) calc(100vw - 74px), 760px'} width={preview.width} height={preview.height} alt={compact?'回忆封面':media.filename} loading={priority?'eager':'lazy'} fetchPriority={priority?'high':'auto'} decoding="async" onError={imageError}/>:
     <div className="media-placeholder"><span aria-hidden="true">{media.kind==='video'?'▷':'▧'}</span><p role="status">{status}</p></div>;
  return <figure className={`media-item ${compact?'compact':''}`}>
   {media.kind==='video'&&!compact?<div className="video-surface">

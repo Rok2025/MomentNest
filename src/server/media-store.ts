@@ -3,7 +3,7 @@ import { DomainError,type Member } from '../domain/events';
 import { fileKind,fileProblem,MAX_FILES,type MediaRecord } from '../domain/media';
 import { memberFor,type Queryable,type Transaction } from './event-store';
 import { previewLinks,playbackLink } from './media-preview';
-import { coverJoin } from './media-query';
+import { coverJoin,mediaList } from './media-query';
 export async function authorizeUploads(tx:Transaction,authId:string,files:{name:string;size:number}[]){
  if(!files.length||files.length>MAX_FILES)throw new DomainError('VALIDATION','每批请选择1至20份素材');
  for(const file of files){const problem=fileProblem(file.name,file.size);if(problem||file.name.length>255)throw new DomainError('VALIDATION',problem||'文件名过长');}
@@ -59,8 +59,8 @@ export async function listMedia(db:Queryable,authId:string,eventId:string,withPr
 // Used by the feed query and by one batched refresh for unfinished covers.
 export async function listEventCovers(db:Queryable,authId:string,eventIds:string[],withPreviewLinks=false){
  const m=await memberFor(db,authId);
- const {rows}=await db.query(`select e.id,to_jsonb(cover) as cover from momentnest.events e ${coverJoin} where e.household_id=$1 and e.id=any($2::uuid[])`,[m.householdId,eventIds]);
- return rows.map(r=>({eventId:String(r.id),cover:r.cover?mediaRecord(r.cover as Record<string,unknown>,withPreviewLinks):null}));
+ const {rows}=await db.query(`select e.id,to_jsonb(cover) as cover,${mediaList} as media from momentnest.events e ${coverJoin} where e.household_id=$1 and e.id=any($2::uuid[])`,[m.householdId,eventIds]);
+ return rows.map(r=>({eventId:String(r.id),media:((r.media||[]) as Record<string,unknown>[]).map(m=>mediaRecord(m,withPreviewLinks)),cover:r.cover?mediaRecord(r.cover as Record<string,unknown>,withPreviewLinks):null}));
 }
 export async function ownMedia(db:Queryable,authId:string,id:string){const m=await memberFor(db,authId);const r=await db.query('select * from momentnest.media where household_id=$1 and id=$2',[m.householdId,id]);if(!r.rows[0])throw new DomainError('NOT_FOUND','找不到这份素材');return r.rows[0];}
 export async function retryMedia(tx:Transaction,authId:string,id:string){return tx(async db=>{

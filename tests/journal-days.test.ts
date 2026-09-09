@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {journalDays} from '../src/domain/journal-days';
+import {journalDays,journalDayContent} from '../src/domain/journal-days';
 import type {EventRecord} from '../src/domain/events';
 function event(id:string,date:string,overrides:Partial<EventRecord>={}):EventRecord{return {id,occurredOn:date,title:'',body:id,feeling:'',createdAt:'2026-09-10T00:00:00Z',updatedAt:'2026-09-10T00:00:00Z',author:'爸爸',editor:'爸爸',version:1,mediaCount:1,imageCount:1,videoCount:0,coverMediaId:null,...overrides};}
 describe('daily journal presentation',()=>{
@@ -21,5 +21,21 @@ describe('daily journal presentation',()=>{
  it('纯文字、空列表和单条记录保持正常，不修改输入',()=>{
   const source=Object.freeze([Object.freeze(event('text','2026-09-06',{mediaCount:0,imageCount:0}))]);
   expect(journalDays([...source])[0]).toMatchObject({imageCount:0,videoCount:0});expect(journalDays([])).toEqual([]);
+ });
+});
+
+describe('separate daily text and thumbnail sections',()=>{
+ it('combines media from separate uploads, separates kinds and sorts each by capture time',()=>{
+  const media=(id:string,kind:'image'|'video',capturedText:string|null,eventId:string)=>({id,kind,capturedText,eventId,capturedZone:null} as import('../src/domain/media').MediaRecord);
+  const a=event('a','2026-09-06',{body:'今天的文字',media:[media('late','video','2026-09-06T18:00:00+08:00','a'),media('photo','image','2026-09-06T09:00:00+08:00','a')]});
+  const b=event('b','2026-09-06',{body:'',media:[media('early','video','2026-09-06T10:00:00+08:00','b'),media('unknown','video',null,'b')]});
+  const content=journalDayContent(journalDays([a,b])[0]);
+  expect(content.texts.map(e=>e.id)).toEqual(['a']);expect(content.images.map(m=>m.id)).toEqual(['photo']);
+  expect(content.videos.map(m=>m.id)).toEqual(['early','late','unknown']);expect(content.videos[0].eventId).toBe('b');
+ });
+ it('retains both text fields and avoids duplicate thumbnails',()=>{
+  const m={id:'one',kind:'image',capturedText:null,capturedZone:null} as import('../src/domain/media').MediaRecord;
+  const a=event('a','2026-09-06',{body:'正文',feeling:'感受',media:[m,m]});
+  const content=journalDayContent(journalDays([a])[0]);expect(content.images).toHaveLength(1);expect(content.texts[0]).toMatchObject({body:'正文',feeling:'感受'});
  });
 });

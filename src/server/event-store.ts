@@ -1,4 +1,4 @@
-import { coverJoin } from './media-query';
+import { coverJoin,mediaList } from './media-query';
 import { lockUploads,mediaRecord } from './media-store';
 import { bindUploadGroups,type UploadGroup } from './save-media';
 import { createHash,randomUUID } from 'node:crypto';
@@ -12,10 +12,10 @@ export async function memberFor(db: Queryable, authId: string): Promise<Member> 
   if (rows.length !== 1) throw new DomainError('FORBIDDEN', '此账号尚未加入家庭，或已停用');
   return { id: String(rows[0].id), householdId: String(rows[0].household_id), label: rows[0].label as Member['label'] };
 }
-const selection = `select e.id,e.title,e.body,e.feeling,e.occurred_on::text as occurred_on,e.created_at,e.updated_at,e.version,e.media_count,e.cover_media_id,to_jsonb(cover) as cover,(select count(*)::int from momentnest.media m where m.household_id=e.household_id and m.event_id=e.id and m.kind='image') as image_count,(select count(*)::int from momentnest.media m where m.household_id=e.household_id and m.event_id=e.id and m.kind='video') as video_count,a.label as author,u.label as editor
+const selection = `select e.id,e.title,e.body,e.feeling,e.occurred_on::text as occurred_on,e.created_at,e.updated_at,e.version,e.media_count,e.cover_media_id,to_jsonb(cover) as cover,${mediaList} as media,(select count(*)::int from momentnest.media m where m.household_id=e.household_id and m.event_id=e.id and m.kind='image') as image_count,(select count(*)::int from momentnest.media m where m.household_id=e.household_id and m.event_id=e.id and m.kind='video') as video_count,a.label as author,u.label as editor
  from momentnest.events e join momentnest.members a on a.id=e.author_member_id join momentnest.members u on u.id=e.updated_by ${coverJoin}`;
 function record(row: Record<string, unknown>, withPreviewLinks=false): EventRecord {
-  return { id:String(row.id),title:String(row.title),body:String(row.body),feeling:String(row.feeling),occurredOn:String(row.occurred_on),createdAt:new Date(String(row.created_at)).toISOString(),updatedAt:new Date(String(row.updated_at)).toISOString(),author:String(row.author),editor:String(row.editor),version:Number(row.version),mediaCount:Number(row.media_count||0),imageCount:Number(row.image_count||0),videoCount:Number(row.video_count||0),coverMediaId:row.cover_media_id?String(row.cover_media_id):null,cover:row.cover?mediaRecord(row.cover as Record<string,unknown>,withPreviewLinks):null };
+  return { id:String(row.id),title:String(row.title),body:String(row.body),feeling:String(row.feeling),occurredOn:String(row.occurred_on),createdAt:new Date(String(row.created_at)).toISOString(),updatedAt:new Date(String(row.updated_at)).toISOString(),author:String(row.author),editor:String(row.editor),version:Number(row.version),mediaCount:Number(row.media_count||0),imageCount:Number(row.image_count||0),videoCount:Number(row.video_count||0),...(withPreviewLinks?{media:((row.media||[]) as Record<string,unknown>[]).map(m=>mediaRecord(m,true))}:{}),coverMediaId:row.cover_media_id?String(row.cover_media_id):null,cover:row.cover?mediaRecord(row.cover as Record<string,unknown>,withPreviewLinks):null };
 }
 export async function getEvent(db: Queryable, authId: string, id: string): Promise<EventRecord> {
   const m = await memberFor(db, authId);

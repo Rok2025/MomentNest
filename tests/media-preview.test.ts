@@ -77,6 +77,7 @@ describe('independent preview/video lanes and private cover reads',()=>{
   const queries:string[]=[];const counted={query:async(sql:string,args?:unknown[])=>{queries.push(sql);return db.query<Record<string,unknown>>(sql,args);}};
   const page=await listEvents(counted,father,undefined,undefined,true);expect(queries).toHaveLength(2);
   const cover=page.items.find(e=>e.id===ours.id)!.cover!;
+  const gallery=page.items.find(e=>e.id===ours.id)!.media!;expect(gallery.map(m=>m.id)).toEqual([ours.media.id]);expect(gallery[0].preview).toBeDefined();expect(gallery[0]).not.toHaveProperty('object_key');expect(gallery[0]).not.toHaveProperty('metadata');
   expect(cover.hasPreview).toBe(true);expect(cover.preview?.srcSet).toContain('960w');
   const signed=verifyTicket(new URL(cover.preview!.url).searchParams.get('ticket')!);
   expect(signed).toMatchObject({operation:'get',mime:'image/jpeg',key:poster(j.mediaId).previewKey});
@@ -84,7 +85,7 @@ describe('independent preview/video lanes and private cover reads',()=>{
   expect(cover).not.toHaveProperty('metadata');expect(cover).not.toHaveProperty('object_key');
   queries.length=0;
   const covers=await listEventCovers(counted,father,[ours.id,theirs.id],true);
-  expect(queries).toHaveLength(2);expect(covers.map(e=>e.eventId)).toEqual([ours.id]);
+  expect(queries).toHaveLength(2);expect(covers.map(e=>e.eventId)).toEqual([ours.id]);expect(covers[0].media.map(m=>m.id)).toEqual([ours.media.id]);expect(covers[0].media[0].preview).toBeDefined();
   await db.query('update momentnest.members set active=false where auth_user_id=$1',[father]);
   try{await expect(listEventCovers(db,father,[ours.id],true)).rejects.toMatchObject({code:'FORBIDDEN'});}
   finally{await db.query('update momentnest.members set active=true where auth_user_id=$1',[father]);}
