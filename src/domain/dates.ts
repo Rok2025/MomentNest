@@ -30,3 +30,11 @@ export function ageOn(value: string): string {
 export function displayTimestamp(iso: string): string {
   return new Intl.DateTimeFormat('zh-CN', { timeZone: TIME_ZONE, dateStyle: 'medium', timeStyle: 'short', hour12: false }).format(new Date(iso));
 }
+
+export function shortAgeOn(value: string): string {
+  const full = ageOn(value);
+  const [, years, months, days] = full.match(/^(\d+)岁(\d+)个月(\d+)天$/)!;
+  if (Number(years)) return `${years}岁${Number(months) ? `${months}个月` : ''}`;
+  if (Number(months)) return `${months}个月`;
+  return `${days}天`;
+}

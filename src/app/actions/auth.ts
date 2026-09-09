@@ -2,7 +2,8 @@
 import { z } from 'zod';
 import { authClient } from '@/server/auth/client';
 import { appUrl } from '@/server/config';
-import { database } from '@/server/db';
+import { database,prepareDatabase } from '@/server/db';
+import { timed } from '@/server/timing';
 import { memberFor } from '@/server/event-store';
 import type { AuthResult } from '@/domain/events';
 import { requestPasswordRecovery } from '@/server/auth/recovery';
@@ -10,9 +11,10 @@ export async function loginAction(_prev:AuthResult,form:FormData):Promise<AuthRe
   const parsed=z.object({email:z.email(),password:z.string().min(1).max(200),expectedMemberId:z.string().uuid().optional()}).safeParse(Object.fromEntries(form));
   if(!parsed.success)return {ok:false,message:'请输入有效邮箱和密码'};
   try{
-    const auth=await authClient();const {data,error}=await auth.auth.signInWithPassword({email:parsed.data.email,password:parsed.data.password});
+    const ready=prepareDatabase();
+    const auth=await authClient();const {data,error}=await timed('login.auth',()=>auth.auth.signInWithPassword({email:parsed.data.email,password:parsed.data.password}));
     if(error||!data.user)return {ok:false,message:'邮箱或密码不正确，请重试'};
-    try{const member=await memberFor(database(),data.user.id);if(parsed.data.expectedMemberId&&member.id!==parsed.data.expectedMemberId)throw new Error("WRONG_MEMBER");}catch{await auth.auth.signOut();return {ok:false,message:'此账号尚未加入家庭，或记录服务尚未就绪'};}
+    try{const member=await timed('login.member',async()=>{await ready;return memberFor(database(),data.user!.id);});if(parsed.data.expectedMemberId&&member.id!==parsed.data.expectedMemberId)throw new Error("WRONG_MEMBER");}catch{await auth.auth.signOut();return {ok:false,message:'此账号尚未加入家庭，或记录服务尚未就绪'};}
     return {ok:true,message:'登录成功'};
   }catch{return {ok:false,message:'登录服务尚未就绪，请检查服务配置或稍后重试'};}
 }

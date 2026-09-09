@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const config = {
   poweredByHeader: false,
+  devIndicators: false,
   outputFileTracingExcludes: {'/*':['./.private/**/*','./.env*','./work/**/*']},
   async headers() {
     return [{ source: '/:path*', headers: [

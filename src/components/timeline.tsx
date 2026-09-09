@@ -8,7 +8,7 @@ import { ageOn,isCalendarDate } from '@/domain/dates';
 import { addDays,addMonths,type DayCount,type WindowState } from '@/domain/heatmap';
 import type { EventRecord } from '@/domain/events';
 import type { Cursor } from '@/server/event-store';
-export function Timeline({initial,days,today,memberId,initialRange,initialPages=1,demoEvents}:{initial:{items:EventRecord[];next:Cursor|null};days:DayCount[];today:string;memberId:string;initialRange?:{start:string;end:string};initialPages?:number;demoEvents?:EventRecord[]}){
+export function Timeline({initial,days,today,memberId,initialRange,initialPages=1,demoEvents,filtersOpen=true}:{initial:{items:EventRecord[];next:Cursor|null};days:DayCount[];today:string;memberId:string;initialRange?:{start:string;end:string};initialPages?:number;demoEvents?:EventRecord[];filtersOpen?:boolean}){
  const calendarId=useId();
  const [calendar,setCalendar]=useState({open:false,mounted:false});
  const total=days.reduce((sum,day)=>sum+day.count,0);
@@ -33,6 +33,7 @@ export function Timeline({initial,days,today,memberId,initialRange,initialPages=
  }
  const selectedMonth=range&&range.start.endsWith('-01')&&range.end===addDays(addMonths(range.start,1),-1)?range.start.slice(0,7):range?'custom':'';
  return <div className="journal-feed">
+ <section id="journal-filters" className="journal-filter-panel" aria-label="筛选回忆" hidden={!filtersOpen}>
  {(total>0||range)&&<div className="journal-toolbar">
   <p className="journal-total">{range?'这一段时光':'全部回忆'}<span role="status">{busy?'正在读取…':range?`${page.items.length} 段已加载`:`${total} 段珍藏`}</span></p>
   <div className="journal-filters"><label className="sr-only" htmlFor={`${calendarId}-month`}>按月份筛选</label><select id={`${calendarId}-month`} value={selectedMonth} disabled={busy} onChange={event=>{const month=event.target.value;void load(month?{start:month+'-01',end:addDays(addMonths(month+'-01',1),-1)}:undefined);}}><option value="">全部时间</option>{selectedMonth==='custom'&&<option value="custom" disabled>已选日期范围</option>}{[...new Set([...months,...(selectedMonth&&selectedMonth!=='custom'?[selectedMonth]:[])])].sort().reverse().map(month=><option key={month} value={month}>{month.slice(0,4)} 年 {Number(month.slice(5))} 月</option>)}</select>
@@ -43,6 +44,7 @@ export function Timeline({initial,days,today,memberId,initialRange,initialPages=
   {calendar.mounted&&<Heatmap key={JSON.stringify(restoredWindow)||'default'} initialWindow={restoredWindow} selection={range??null} today={today} days={days} onSelect={(start,end)=>void load({start,end})} onWindowChange={s=>{view.current=s;}}/>}
  </div>
  {range&&<div className="journal-range"><span>{range.start} — {range.end}</span><button type="button" onClick={()=>void load(undefined)} disabled={busy}>清除日期筛选 ×</button></div>}
+ </section>
  {error&&<div className="notice" role="alert">{error} <button onClick={()=>void load(range)}>重试</button></div>}
  <div aria-busy={busy}>{!page.items.length?<section className="panel empty journal-empty"><div className="empty-mark" aria-hidden="true">✦</div><h2>{range?'这一段日子，还没有记录':'第一段回忆，从这里开始'}</h2><p>{range?'换个时间看看，或者补记这段日子的小事。':'第一次伸手、一个小小的笑容，或是今天的心情。'}</p><NewEventButton>记下一刻</NewEventButton></section>:<section className="timeline" aria-label="按发生日期倒序的回忆">{page.items.map((e,i)=>{const month=e.occurredOn.slice(0,7),heading=month!==page.items[i-1]?.occurredOn.slice(0,7);return <div key={e.id}>{heading&&<h2 className="chapter"><small>{month.slice(0,4)} 年</small>{Number(month.slice(5))} 月</h2>}<article id={`event-${e.id}`} className={`entry ${i%2?'right':''}`}><div className="stamp"><span>{Number(e.occurredOn.slice(8))}日</span></div><div className="memory panel"><div className="card-top"><small>{e.author}记录</small><span className="age">{ageOn(e.occurredOn)}</span></div>{e.title.trim()&&<h2><Link href={`/events/${e.id}`} onClick={()=>remember(e)}>{e.title}</Link></h2>}{e.mediaCount>0&&<Link className="cover-link" href={`/events/${e.id}`} onClick={()=>remember(e)}><Cover eventId={e.id} id={e.coverMediaId}/></Link>}<p className="excerpt">{e.body||e.feeling}</p><div className="card-bottom"><span className="muted">{e.mediaCount?[e.imageCount?`${e.imageCount} 张照片`:'',e.videoCount?`${e.videoCount} 段视频`:''].filter(Boolean).join(' · '):'文字回忆'}</span><Link href={`/events/${e.id}`} onClick={()=>remember(e)}>慢慢回看 →</Link></div></div></article></div>;})}</section>}</div>
  <nav className="pager">{page.next&&<button disabled={busy} onClick={()=>void load(range,true)}>{busy?'正在翻开…':'更早的回忆 ↓'}</button>}</nav></div>;

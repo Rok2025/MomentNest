@@ -80,3 +80,30 @@ html { scrollbar-gutter: stable; }
 }
 
 .dialog-saved { position: fixed; right: 20px; bottom: 20px; z-index: 10; max-width: calc(100vw - 40px); margin: 0; padding: 12px 18px; box-shadow: 0 4px 24px #22301f20; }
+
+/* One quiet, sticky header; filters appear only when requested. */
+.topbar { position: sticky; top: 0; z-index: 20; min-height: 76px; padding: 12px 0; gap: 20px; background: var(--bg); box-shadow: 0 -20px 0 20px var(--bg); }
+.brand-group { display: flex; align-items: center; gap: 18px; min-width: 0; }
+.brand-group .brand { white-space: nowrap; }
+.header-age { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.header-actions { display: flex; gap: 10px; margin-left: auto; }
+.header-actions button { font-size: 13px; white-space: nowrap; }
+.topbar nav { flex-shrink: 0; font-size: 13px; gap: 12px; }
+.topbar nav:only-of-type { margin-left: auto; }
+.header-actions + nav { margin-left: 0 !important; }
+.filter-toggle[aria-expanded=true] { background: var(--soft); }
+.journal-filter-panel[hidden] { display: none; }
+.journal-filter-panel { padding-bottom: 12px; scroll-margin-top: 88px; }
+.journal-feed { padding-top: 8px; }
+.entry { scroll-margin-top: 96px; }
+@media(max-width:650px) {
+ .topbar { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px 12px; padding: 10px 0; }
+ .brand-group { gap: 10px; flex-wrap: wrap; }
+ .header-age { font-size: 11px; }
+ .topbar nav { grid-column: 2; grid-row: 1; gap: 8px; }
+ .topbar nav button { font-size: 12px; min-height: 36px; padding: 5px 10px; }
+ .header-actions { grid-column: 1 / -1; grid-row: 2; margin: 0; justify-content: flex-end; }
+ .header-actions button { min-height: 38px; padding: 6px 12px; }
+ .entry { scroll-margin-top: 132px; }
+ .journal-filter-panel { scroll-margin-top: 124px; }
+}
