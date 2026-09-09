@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { beforeAll,afterAll,describe,it,expect } from 'vitest';
 import { saveEvent,getEvent,listEvents,type Transaction } from '../src/server/event-store';
-import { authorizeUpload,completeUpload,cancelUpload,listMedia,retryMedia } from '../src/server/media-store';
+import { authorizeUpload,authorizeUploads,completeUpload,cancelUpload,listMedia,retryMedia } from '../src/server/media-store';
 import { claimJob,finishJob,claimExpired } from '../src/server/job-store';
 import { heatmapCounts } from '../src/server/heatmap-store';
 const father=randomUUID(),mother=randomUUID(),outsider=randomUUID(),h=randomUUID();let db:PGlite;
@@ -13,6 +13,36 @@ async function upload(auth=father){const u=await authorizeUpload(tx,auth,{name:'
 beforeAll(async()=>{db=new PGlite();await db.exec('create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key);');for(const name of ['20260907171842_m1_private_events.sql','20260908011410_v1_media.sql'])await db.exec(readFileSync(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));await db.query('insert into auth.users values($1),($2),($3)',[father,mother,outsider]);await db.query('insert into momentnest.households(id,name) values($1,$2)',[h,'隔离家庭']);await db.query('insert into momentnest.subjects(household_id) values($1)',[h]);await db.query("insert into momentnest.members(household_id,auth_user_id,label) values($1,$2,'爸爸'),($1,$3,'妈妈')",[h,father,mother]);});
 afterAll(async()=>{await db.close();});
 describe('media save and job contracts',()=>{
+ it('批量授权只开一次事务，保持选择顺序且重试复用原上传',async()=>{
+  let transactions=0,queries=0;const counted:Transaction=fn=>tx(t=>{transactions++;return fn({query:async(sql,args)=>{queries++;return t.query(sql,args);}});});
+  const files=[{name:'second.mp4',size:456},{name:'first.jpg',size:123},{name:'first.jpg',size:123}];
+  const rows=await authorizeUploads(counted,father,files);
+  expect(transactions).toBe(1);expect(queries).toBe(3);
+  expect(rows.map(r=>({name:r.filename,size:Number(r.expected_size)}))).toEqual(files);
+  expect(new Set(rows.map(r=>r.id)).size).toBe(3);
+  expect((await authorizeUpload(tx,father,{...files[0],id:String(rows[0].id)})).id).toBe(rows[0].id);
+  await expect(authorizeUpload(tx,mother,{...files[0],id:String(rows[0].id)})).rejects.toMatchObject({code:'VALIDATION'});
+  await Promise.all(rows.map(r=>cancelUpload(tx,father,String(r.id))));
+ });
+ it('批量授权拒绝超限、不合法文件及家庭外用户，失败不插入半批',async()=>{
+  const before=(await db.query('select count(*)::int as n from momentnest.upload_sessions')).rows[0];
+  await expect(authorizeUploads(tx,father,[])).rejects.toMatchObject({code:'VALIDATION'});
+  await expect(authorizeUploads(tx,father,Array.from({length:21},()=>({name:'x.jpg',size:10})))).rejects.toMatchObject({code:'VALIDATION'});
+  await expect(authorizeUploads(tx,father,[{name:'ok.jpg',size:10},{name:'bad.exe',size:10}])).rejects.toMatchObject({code:'VALIDATION'});
+  await expect(authorizeUploads(tx,outsider,[{name:'x.jpg',size:10}])).rejects.toMatchObject({code:'FORBIDDEN'});
+  expect((await db.query('select count(*)::int as n from momentnest.upload_sessions')).rows[0]).toEqual(before);
+ });
+ it('整批授权计入100份待保存配额，超限不会部分成功',async()=>{
+  const m=(await db.query<{id:string}>('select id from momentnest.members where auth_user_id=$1',[father])).rows[0];
+  await db.query(`insert into momentnest.upload_sessions(household_id,member_id,object_key,filename,kind,expected_size)
+    select $1,$2,'originals/quota-'||n||'.bin','__quota.jpg','image',10 from generate_series(1,99) as n`,[h,m.id]);
+  try{
+   await expect(authorizeUploads(tx,father,[{name:'a.jpg',size:10},{name:'b.jpg',size:10}])).rejects.toMatchObject({code:'VALIDATION'});
+   expect((await db.query<{n:number}>("select count(*)::int as n from momentnest.upload_sessions where state='authorized'")).rows[0].n).toBe(99);
+   const last=await authorizeUploads(tx,father,[{name:'__quota.jpg',size:10}]);expect(last).toHaveLength(1);
+   await expect(authorizeUploads(tx,father,[{name:'a.jpg',size:10}])).rejects.toMatchObject({code:'VALIDATION'});
+  }finally{await db.query("delete from momentnest.upload_sessions where filename='__quota.jpg'");}
+ });
  it('纯媒体原件验证、绑定、入队与计数同事务，同键重试只一条',async()=>{const id=await upload(),r=raw([id]);const event=await saveEvent(tx,father,r);expect(await saveEvent(tx,father,r)).toBe(event);expect(await getEvent(db,father,event)).toMatchObject({mediaCount:1,imageCount:1,videoCount:0});expect((await listMedia(db,mother,event)).length).toBe(1);expect((await heatmapCounts(db,father)).find(d=>d.date==='2025-06-01')?.count).toBe(1);expect((await db.query('select state from momentnest.upload_sessions where id=$1',[id])).rows[0]).toEqual({state:'bound'});});
  it('跨天上传原子归档，文字只归选定日期，重试不重复',async()=>{
   const ids=[await upload(),await upload(),await upload()];

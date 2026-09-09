@@ -2,18 +2,31 @@ import { randomUUID } from 'node:crypto';
 import { DomainError,type Member } from '../domain/events';
 import { fileKind,fileProblem,MAX_FILES,type MediaRecord } from '../domain/media';
 import { memberFor,type Queryable,type Transaction } from './event-store';
+export async function authorizeUploads(tx:Transaction,authId:string,files:{name:string;size:number}[]){
+ if(!files.length||files.length>MAX_FILES)throw new DomainError('VALIDATION','每批请选择1至20份素材');
+ for(const file of files){const problem=fileProblem(file.name,file.size);if(problem||file.name.length>255)throw new DomainError('VALIDATION',problem||'文件名过长');}
+ return tx(async db=>{
+  const m=await memberFor(db,authId);
+  await db.query('select pg_advisory_xact_lock(hashtextextended($1,0))',[`uploads:${m.id}`]);
+  const ids=files.map(()=>randomUUID());
+  // One insert for the whole selection; the member lock keeps the quota atomic.
+  const r=await db.query(`insert into momentnest.upload_sessions(id,household_id,member_id,object_key,filename,kind,expected_size)
+   select f.id,$1,$2,f.key,f.name,f.kind,f.size
+   from unnest($3::uuid[],$4::text[],$5::text[],$6::text[],$7::bigint[]) as f(id,key,name,kind,size)
+   where (select count(*) from momentnest.upload_sessions where member_id=$2 and state in ('authorized','verified') and expires_at>clock_timestamp())+$8<=100 returning *`,
+   [m.householdId,m.id,ids,ids.map(id=>`originals/${m.householdId}/${id}.bin`),files.map(f=>f.name),files.map(f=>fileKind(f.name)),files.map(f=>f.size),files.length]);
+  if(r.rows.length!==files.length)throw new DomainError('VALIDATION','未保存素材较多，请先保存或移除当前选择');
+  return ids.map(id=>r.rows.find(row=>row.id===id)!);
+ });
+}
 export async function authorizeUpload(tx:Transaction,authId:string,input:{name:string;size:number;id?:string}){
+ if(!input.id)return (await authorizeUploads(tx,authId,[input]))[0];
  const problem=fileProblem(input.name,input.size);if(problem||input.name.length>255)throw new DomainError('VALIDATION',problem||'文件名过长');
  return tx(async db=>{
   const m=await memberFor(db,authId);
   await db.query('select pg_advisory_xact_lock(hashtextextended($1,0))',[`uploads:${m.id}`]);
-  if(input.id){const r=await db.query("select * from momentnest.upload_sessions where id=$1 and household_id=$2 and member_id=$3 and state in ('authorized','verified') and expires_at>clock_timestamp()+interval '1 minute'",[input.id,m.householdId,m.id]);
-   const row=r.rows[0];if(!row||row.filename!==input.name||Number(row.expected_size)!==input.size)throw new DomainError('VALIDATION','上传已取消或过期，请移除后重新选择文件');return row;
-  }
-  const pending=await db.query("select count(*)::int as n from momentnest.upload_sessions where member_id=$1 and state in ('authorized','verified') and expires_at>clock_timestamp()",[m.id]);
-  if(Number(pending.rows[0].n)>=100)throw new DomainError('VALIDATION','未保存素材较多，请先保存或移除当前选择');
-  const id=randomUUID(),key=`originals/${m.householdId}/${id}.bin`;
-  const r=await db.query('insert into momentnest.upload_sessions(id,household_id,member_id,object_key,filename,kind,expected_size) values($1,$2,$3,$4,$5,$6,$7) returning *',[id,m.householdId,m.id,key,input.name,fileKind(input.name),input.size]);return r.rows[0];
+  const r=await db.query("select * from momentnest.upload_sessions where id=$1 and household_id=$2 and member_id=$3 and state in ('authorized','verified') and expires_at>clock_timestamp()+interval '1 minute'",[input.id,m.householdId,m.id]);
+  const row=r.rows[0];if(!row||row.filename!==input.name||Number(row.expected_size)!==input.size)throw new DomainError('VALIDATION','上传已取消或过期，请移除后重新选择文件');return row;
  });
 }
 export async function ownUpload(db:Queryable,authId:string,id:string){const m=await memberFor(db,authId);const r=await db.query('select * from momentnest.upload_sessions where id=$1 and household_id=$2 and member_id=$3',[id,m.householdId,m.id]);if(!r.rows[0])throw new DomainError('NOT_FOUND','没有找到这份上传');return r.rows[0];}

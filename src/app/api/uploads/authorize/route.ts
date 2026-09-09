@@ -1,7 +1,18 @@
 import { z } from 'zod';
 import { requireIdentity } from '@/server/auth/session';
-import { transaction } from '@/server/db';
-import { authorizeUpload } from '@/server/media-store';
+import { transaction,prepareDatabase } from '@/server/db';
+import { authorizeUpload,authorizeUploads } from '@/server/media-store';
 import { signedObjectUrl } from '@/server/storage/local';
 import { json,apiFailure,checkOrigin } from '@/server/http';
-export async function POST(req:Request){try{checkOrigin(req);const auth=await requireIdentity();const input=z.object({name:z.string().min(1).max(255),size:z.number().int().positive(),id:z.string().uuid().optional()}).strict().parse(await req.json());const u=await authorizeUpload(transaction,auth,input);return json({id:u.id,url:signedObjectUrl({key:String(u.object_key),operation:'put',expires:Math.min(Date.now()+30*60*1000,new Date(String(u.expires_at)).valueOf()-1000),size:Number(u.expected_size),kind:u.kind as 'image'|'video'}),verified:u.state==='verified'});}catch(e){return apiFailure(e);}}
+const file=z.object({name:z.string().min(1).max(255),size:z.number().int().positive()}).strict();
+const schema=z.union([z.object({files:z.array(file).min(1).max(20)}).strict(),file.extend({id:z.string().uuid().optional()})]);
+function ticket(u:Record<string,unknown>){
+ const expires=Math.min(Date.now()+30*60*1000,new Date(String(u.expires_at)).valueOf()-1000);
+ return {id:u.id,expires,url:signedObjectUrl({key:String(u.object_key),operation:'put',expires,size:Number(u.expected_size),kind:u.kind as 'image'|'video'}),verified:u.state==='verified'};
+}
+export async function POST(req:Request){try{
+ checkOrigin(req);const input=schema.parse(await req.json());
+ void prepareDatabase();const auth=await requireIdentity();
+ if('files' in input)return json({uploads:(await authorizeUploads(transaction,auth,input.files)).map(ticket)});
+ return json(ticket(await authorizeUpload(transaction,auth,input)));
+}catch(e){return apiFailure(e);}}
