@@ -42,7 +42,7 @@ export function MediaView({media,compact=false,priority=false,thumbnail=false,on
     // eslint-disable-next-line @next/next/no-img-element
     <img src={preview.url} srcSet={preview.srcSet} sizes={thumbnail?'(max-width: 650px) 28vw, 150px':compact?'(max-width: 650px) calc(100vw - 104px), (max-width: 1120px) 40vw, 450px':'(max-width: 650px) calc(100vw - 74px), 760px'} width={preview.width} height={preview.height} alt={compact?'回忆封面':media.filename} loading={priority?'eager':'lazy'} fetchPriority={priority?'high':'auto'} decoding="async" onError={imageError}/>:
     <div className="media-placeholder"><span aria-hidden="true">{media.kind==='video'?'▷':'▧'}</span><p role="status">{status}</p></div>;
- return <figure className={`media-item ${compact?'compact':''}`}>
+ return <figure className={`media-item ${compact?'compact':''} ${media.needsTimeReview?'time-review':''}`}>
   {media.kind==='video'&&!compact?<div className="video-surface">
    {visual}
    {playback&&buffering&&!needsPlay&&<div className={bufferStyles.buffer} role="status"><span>视频缓冲中，请稍候…</span></div>}
@@ -51,9 +51,11 @@ export function MediaView({media,compact=false,priority=false,thumbnail=false,on
     {busy&&<span className="video-play-status" role="status">正在加载视频…</span>}
    </button>}
   </div>:visual}
+  {media.needsTimeReview&&<span className="media-time-review-badge">待修改时间</span>}
   {compact&&media.kind==='video'&&<span className="video-badge">▷ {media.status==='ready'?'视频':status}</span>}
   {compact&&error&&<span className="media-load-error">预览暂不可用，点开重试</span>}
   {!compact&&<figcaption><strong>{media.filename}</strong>
+   {media.needsTimeReview&&<p className="media-time-review-note">待修改时间：当前归档日期需要核对。</p>}
    {preview&&media.status!=='ready'&&<p className="media-processing" role="status">{status}</p>}
    <p className="muted">拍摄时间：{formatCaptureTime(media.capturedText,media.capturedZone)}</p><div className="media-actions">
     {playback&&error&&<button type="button" disabled={busy} onClick={()=>void play(true)}>刷新播放链接 ▷</button>}

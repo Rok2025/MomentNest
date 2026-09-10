@@ -17,7 +17,7 @@ export function JournalDay({day,index,total,remember}:{day:Day;index:number;tota
   if(!items.length)return null;
   return <section className={styles.section} aria-label={`${day.date}的${kind}`}>
    <h3>{kind}<span>{items.length}</span></h3>
-   <div className={styles.grid}>{items.map((media,i)=><button key={media.id} type="button" className={styles.thumbnail} aria-label={`查看${kind}：${media.filename}`} onClick={()=>setSelected(media.id)}>
+   <div className={styles.grid}>{items.map((media,i)=><button key={media.id} type="button" className={styles.thumbnail} aria-label={`查看${kind}：${media.filename}${media.needsTimeReview?'，待修改时间':''}`} onClick={()=>setSelected(media.id)}>
     <MediaView media={media} compact thumbnail priority={index===0&&i<3}/>
    </button>)}</div>
   </section>;

@@ -26,7 +26,7 @@ const poster=(mediaId:string)=>({previewKey:`derivatives/${mediaId}/poster.jpg`,
 beforeAll(async()=>{
  root=await mkdtemp(join(tmpdir(),'momentnest-preview-'));vi.stubEnv('MEDIA_ROOT',root);vi.stubEnv('MEDIA_SIGNING_SECRET','test-only-preview-signing-'+randomUUID());
  db=new PGlite();await db.exec('create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key);');
- for(const name of ['20260907171842_m1_private_events.sql','20260908011410_v1_media.sql','20260910055215_raise_media_limit_to_50.sql','20260910070728_raise_media_limit_to_100.sql','20260910074242_remove_event_media_count_limit.sql'])await db.exec(readFileSync(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+ for(const name of ['20260907171842_m1_private_events.sql','20260908011410_v1_media.sql','20260910055215_raise_media_limit_to_50.sql','20260910070728_raise_media_limit_to_100.sql','20260910074242_remove_event_media_count_limit.sql','20260910075100_add_media_time_review_flag.sql'])await db.exec(readFileSync(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
  await db.query('insert into auth.users values($1),($2)',[father,other]);
  await db.query("insert into momentnest.households(id,name) values($1,'test'),($2,'other')",[house,otherHouse]);
  await db.query('insert into momentnest.subjects(household_id) values($1),($2)',[house,otherHouse]);
@@ -35,6 +35,19 @@ beforeAll(async()=>{
 beforeEach(async()=>{await db.exec("update momentnest.media_jobs set state='ready';update momentnest.media set status='ready',metadata=metadata||'{\"previewSizes\":[]}'::jsonb");});
 afterAll(async()=>{await db.close();await rm(root,{recursive:true,force:true});vi.unstubAllEnvs();});
 describe('independent preview/video lanes and private cover reads',()=>{
+ it('时间待核对标记随列表和详情返回，处理预览不会覆盖标记',async()=>{
+  const ours=await event();
+  expect(ours.media.needsTimeReview).toBe(false);
+  await db.query('update momentnest.media set needs_time_review=true where id=$1',[ours.media.id]);
+  const job=(await claimJob(tx,'preview'))!;
+  expect(job.mediaId).toBe(ours.media.id);
+  await finishJob(tx,job,poster(job.mediaId));
+  expect((await listMedia(db,father,ours.id))[0].needsTimeReview).toBe(true);
+  const page=await listEvents(db,father,undefined,undefined,true);
+  expect(page.items.find(e=>e.id===ours.id)?.media?.[0].needsTimeReview).toBe(true);
+  expect((await listEventCovers(db,father,[ours.id],true))[0].media[0].needsTimeReview).toBe(true);
+ });
+
  it('先发布视频封面，转码占用期间照片仍可领取，最终保留已发布封面',async()=>{
   const clip=await event('video');
   expect(await claimJob(tx,'video')).toBeNull();

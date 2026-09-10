@@ -160,3 +160,6 @@ html { scrollbar-gutter: stable; }
 .upload-date-notice button{font-size:12px;min-height:40px}
 .upload-list [data-date-pending] .media-date{border-left:2px solid #b67a50;padding-left:8px}
 .upload-list .media-date>small{flex-basis:100%}
+.media-item.time-review{outline:2px solid #b8661b;outline-offset:-2px}
+.media-time-review-badge{position:absolute;top:8px;left:8px;z-index:1;max-width:calc(100% - 16px);padding:4px 8px;border:1px solid #b8661b;border-radius:6px;background:#fff1d6;color:#703609;font-size:12px;font-weight:700;line-height:1.4;pointer-events:none;box-shadow:0 1px 4px #0002}
+.media-time-review-note{padding:8px 12px;border-left:3px solid #b8661b;background:#fff1d6;color:#703609;font-size:13px}

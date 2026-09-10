@@ -35,6 +35,7 @@ try {
     const pool = new Pool({ connectionString: u.toString(), ssl: { rejectUnauthorized: true, ca }, connectionTimeoutMillis: 8000, query_timeout: 8000, max: 1 });
     try {
       await pool.query('select media_id from momentnest.media_jobs limit 0');
+      await pool.query('select needs_time_review from momentnest.media limit 0');
       const { rows } = await pool.query("select has_table_privilege(current_user,'momentnest.events','delete') as can_delete");
       if (rows[0].can_delete) throw Error();
       if (!worker) {
