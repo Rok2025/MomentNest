@@ -6,6 +6,7 @@ import {uploadOriginal,type UploadAuth} from '@/domain/upload-original';
 import {uploadProgress,formatUploadBytes} from '@/domain/upload-progress';
 import {UploadQueue} from '@/domain/upload-queue';
 import {hashFile} from '@/domain/file-hash';
+import {monitorUploads} from '@/domain/upload-diagnostic';
 import {fileProblem,MAX_FILES} from '@/domain/media';
 import {BIRTHDAY,validEventDate} from '@/domain/dates';
 import {uploadDateReady} from '@/domain/upload-date';
@@ -18,6 +19,7 @@ export function Uploader({items,onChange,disabled,onExpired,date,today,memberId}
  const [queue]=useState(()=>new UploadQueue(2)),[open,setOpen]=useState(false),[message,setMessage]=useState(''),[duplicates,setDuplicates]=useState<{name:string;existing?:DuplicateMedia}[]>([]),[restoreNotice,setRestoreNotice]=useState('');
  const marker=`momentnest:upload-page:${memberId}`;
  useEffect(()=>{current.current=items;},[items]);
+ useEffect(()=>monitorUploads(memberId,()=>current.current),[memberId]);
  useEffect(()=>{
   mounted.current=true;
   try{const previous=JSON.parse(sessionStorage.getItem(marker)||'null');if(previous?.count)setTimeout(()=>{if(mounted.current)setRestoreNotice(`上次页面离开时有 ${previous.count} 份素材未保存，请从草稿中继续。读取中尚未登记的文件需要重新选择。`);},0);}catch{}
