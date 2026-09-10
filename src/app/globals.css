@@ -163,3 +163,15 @@ html { scrollbar-gutter: stable; }
 .media-item.time-review{outline:2px solid #b8661b;outline-offset:-2px}
 .media-time-review-badge{position:absolute;top:8px;left:8px;z-index:1;max-width:calc(100% - 16px);padding:4px 8px;border:1px solid #b8661b;border-radius:6px;background:#fff1d6;color:#703609;font-size:12px;font-weight:700;line-height:1.4;pointer-events:none;box-shadow:0 1px 4px #0002}
 .media-time-review-note{padding:8px 12px;border-left:3px solid #b8661b;background:#fff1d6;color:#703609;font-size:13px}
+
+/* Compact desktop actions and a distinct signed-in identity. */
+.topbar{min-height:64px;gap:12px}
+.header-actions{gap:8px}
+.header-actions button,.header-actions>.button,.topbar nav button{min-height:34px;padding:5px 11px;border-radius:8px;font-size:12px;line-height:1.5;white-space:nowrap}
+.topbar nav{gap:8px}
+.topbar nav button{padding-inline:7px;border-color:transparent;background:transparent;color:var(--muted)}
+.topbar nav button:hover{background:var(--soft);color:var(--ink)}
+.member-badge{display:inline-flex;align-items:center;gap:7px;min-height:34px;padding:4px 10px 4px 5px;border:1px solid #c5d4ba;border-radius:99px;background:var(--soft);color:var(--green);white-space:nowrap}
+.member-avatar{display:grid;place-items:center;width:24px;height:24px;flex-shrink:0;border-radius:50%;background:var(--green);color:#fff;font-size:12px;font-weight:600;line-height:1}
+.member-badge strong{font-size:13px;font-weight:650}
+@media(max-width:650px){.topbar{gap:8px 10px}.header-actions button,.header-actions>.button,.topbar nav button{min-height:44px}.member-badge{gap:6px;padding-right:8px}}
