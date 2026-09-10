@@ -24,7 +24,7 @@ export function HomeJournal({label,memberId,today,initial,days,initialRange,init
       }
     });
   }
-  return <NewEventDialog memberId={memberId}>
+  return <NewEventDialog>
     <Header label={label} age={<span className="header-age" title={`又又今天 ${ageOn(today)}`}>又又 · {shortAgeOn(today)}</span>} actions={<>
       <button type="button" className="filter-toggle" aria-expanded={filtersOpen} aria-controls="journal-filters" onClick={toggleFilters}>{filtersOpen?'收起筛选':'筛选'}</button>
       <NewEventButton>＋ 记下一刻</NewEventButton>

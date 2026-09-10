@@ -11,6 +11,8 @@ beforeAll(async()=>{
  db=new PGlite();await db.exec('create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key);');
  await db.exec(readFileSync(new URL('../supabase/migrations/20260907171842_m1_private_events.sql',import.meta.url),'utf8'));
  await db.exec(readFileSync(new URL('../supabase/migrations/20260908011410_v1_media.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../supabase/migrations/20260910055215_raise_media_limit_to_50.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../supabase/migrations/20260910070728_raise_media_limit_to_100.sql',import.meta.url),'utf8'));
  await db.query('insert into auth.users values($1),($2),($3)',[father,mother,other]);
  await db.query('insert into momentnest.households(id,name) values($1,$2)',[h,'隔离测试家庭']);
  await db.query('insert into momentnest.subjects(household_id) values($1)',[h]);

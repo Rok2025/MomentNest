@@ -37,6 +37,11 @@ try {
       await pool.query('select media_id from momentnest.media_jobs limit 0');
       const { rows } = await pool.query("select has_table_privilege(current_user,'momentnest.events','delete') as can_delete");
       if (rows[0].can_delete) throw Error();
+      if (!worker) {
+        stage = 'media limit migration (100 files required)';
+        const limit = await pool.query("select pg_get_constraintdef(oid) as definition from pg_constraint where conrelid='momentnest.events'::regclass and conname='events_media_count_check' and convalidated");
+        if (!/media_count\s*<=\s*100\b/.test(limit.rows[0]?.definition || '')) throw Error();
+      }
     } finally { await pool.end(); }
   }
   stage = 'Auth connection and signup policy';

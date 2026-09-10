@@ -1,4 +1,4 @@
-export const MAX_FILES=20;
+export const MAX_FILES=100;
 export const MAX_IMAGE_BYTES=50*1024*1024;
 export const MAX_VIDEO_BYTES=500*1024*1024;
 export type MediaKind='image'|'video';

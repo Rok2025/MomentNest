@@ -5,7 +5,7 @@ import { memberFor,type Queryable,type Transaction } from './event-store';
 import { previewLinks,playbackLink } from './media-preview';
 import { coverJoin,mediaList } from './media-query';
 export async function authorizeUploads(tx:Transaction,authId:string,files:{name:string;size:number}[]){
- if(!files.length||files.length>MAX_FILES)throw new DomainError('VALIDATION','每批请选择1至20份素材');
+ if(!files.length||files.length>MAX_FILES)throw new DomainError('VALIDATION',`每批请选择1至${MAX_FILES}份素材`);
  for(const file of files){const problem=fileProblem(file.name,file.size);if(problem||file.name.length>255)throw new DomainError('VALIDATION',problem||'文件名过长');}
  return tx(async db=>{
   const m=await memberFor(db,authId);
@@ -42,7 +42,7 @@ export async function completeUpload(tx:Transaction,authId:string,id:string,evid
 }
 export async function cancelUpload(tx:Transaction,authId:string,id:string){return tx(async db=>{const m=await memberFor(db,authId);await db.query("update momentnest.upload_sessions set state='cancelled' where id=$1 and household_id=$2 and member_id=$3 and state in ('authorized','verified')",[id,m.householdId,m.id]);});}
 export async function lockUploads(db:Queryable,m:Member,ids:string[]){
- if(new Set(ids).size!==ids.length||ids.length>MAX_FILES)throw new DomainError('VALIDATION','所选文件重复或数量超过20份');
+ if(new Set(ids).size!==ids.length||ids.length>MAX_FILES)throw new DomainError('VALIDATION',`所选文件重复或数量超过${MAX_FILES}份`);
  if(!ids.length)return [];
  const {rows}=await db.query('select * from momentnest.upload_sessions where id=any($1::uuid[]) order by id for update',[ids]);
  if(rows.length!==ids.length||rows.some(u=>u.household_id!==m.householdId||u.member_id!==m.id||u.state!=='verified'||new Date(String(u.expires_at)).valueOf()<=Date.now()))throw new DomainError('VALIDATION','部分素材未验证、已失效或不属于当前账号，请重新上传');

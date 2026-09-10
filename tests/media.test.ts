@@ -10,7 +10,7 @@ const father=randomUUID(),mother=randomUUID(),outsider=randomUUID(),h=randomUUID
 const tx:Transaction=fn=>db.transaction(t=>fn(t));
 const raw=(ids:string[]=[])=>({requestKey:randomUUID(),title:'媒体测试',body:'',feeling:'',occurredOn:'2025-06-01',uploadIds:ids});
 async function upload(auth=father){const u=await authorizeUpload(tx,auth,{name:'photo.jpg',size:123});await completeUpload(tx,auth,String(u.id),{sha256:'a'.repeat(64),size:123,kind:'image',mime:'image/jpeg'});return String(u.id);}
-beforeAll(async()=>{db=new PGlite();await db.exec('create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key);');for(const name of ['20260907171842_m1_private_events.sql','20260908011410_v1_media.sql'])await db.exec(readFileSync(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));await db.query('insert into auth.users values($1),($2),($3)',[father,mother,outsider]);await db.query('insert into momentnest.households(id,name) values($1,$2)',[h,'隔离家庭']);await db.query('insert into momentnest.subjects(household_id) values($1)',[h]);await db.query("insert into momentnest.members(household_id,auth_user_id,label) values($1,$2,'爸爸'),($1,$3,'妈妈')",[h,father,mother]);});
+beforeAll(async()=>{db=new PGlite();await db.exec('create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key);');for(const name of ['20260907171842_m1_private_events.sql','20260908011410_v1_media.sql','20260910055215_raise_media_limit_to_50.sql','20260910070728_raise_media_limit_to_100.sql'])await db.exec(readFileSync(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));await db.query('insert into auth.users values($1),($2),($3)',[father,mother,outsider]);await db.query('insert into momentnest.households(id,name) values($1,$2)',[h,'隔离家庭']);await db.query('insert into momentnest.subjects(household_id) values($1)',[h]);await db.query("insert into momentnest.members(household_id,auth_user_id,label) values($1,$2,'爸爸'),($1,$3,'妈妈')",[h,father,mother]);});
 afterAll(async()=>{await db.close();});
 describe('media save and job contracts',()=>{
  it('批量授权只开一次事务，保持选择顺序且重试复用原上传',async()=>{
@@ -27,7 +27,7 @@ describe('media save and job contracts',()=>{
  it('批量授权拒绝超限、不合法文件及家庭外用户，失败不插入半批',async()=>{
   const before=(await db.query('select count(*)::int as n from momentnest.upload_sessions')).rows[0];
   await expect(authorizeUploads(tx,father,[])).rejects.toMatchObject({code:'VALIDATION'});
-  await expect(authorizeUploads(tx,father,Array.from({length:21},()=>({name:'x.jpg',size:10})))).rejects.toMatchObject({code:'VALIDATION'});
+  await expect(authorizeUploads(tx,father,Array.from({length:101},()=>({name:'x.jpg',size:10})))).rejects.toMatchObject({code:'VALIDATION'});
   await expect(authorizeUploads(tx,father,[{name:'ok.jpg',size:10},{name:'bad.exe',size:10}])).rejects.toMatchObject({code:'VALIDATION'});
   await expect(authorizeUploads(tx,outsider,[{name:'x.jpg',size:10}])).rejects.toMatchObject({code:'FORBIDDEN'});
   expect((await db.query('select count(*)::int as n from momentnest.upload_sessions')).rows[0]).toEqual(before);

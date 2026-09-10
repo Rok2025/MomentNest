@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { validEventDate, todayShanghai } from './dates';
-import type { MediaRecord } from './media';
+import { MAX_FILES, type MediaRecord } from './media';
 export const uuid = z.string().uuid();
 export const inputSchema = z.object({
   requestKey: uuid,
@@ -10,8 +10,8 @@ export const inputSchema = z.object({
   title: z.string().trim().max(120, '标题最多120字'),
   body: z.string().trim().max(20000, '正文最多20000字'),
   feeling: z.string().trim().max(5000, '感受最多5000字'),
-  uploadIds: z.array(uuid).max(20).default([]),
-  uploadDates: z.array(z.object({id:uuid,occurredOn:z.string()}).strict()).max(20).optional(),
+  uploadIds: z.array(uuid).max(MAX_FILES).default([]),
+  uploadDates: z.array(z.object({id:uuid,occurredOn:z.string()}).strict()).max(MAX_FILES).optional(),
   coverMediaId: uuid.nullable().optional(),
 }).strict().superRefine((v, ctx) => {
   if (!v.id && !v.body && !v.feeling && !v.uploadIds.length) ctx.addIssue({ code: 'custom', message: '写下这一刻或你的感受后再保存', path: ['body'] });

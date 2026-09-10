@@ -3,13 +3,13 @@ import {readFileSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {beforeAll,afterAll,describe,it,expect} from 'vitest';
 import {saveEvent,type Transaction} from '../src/server/event-store';
-import {authorizeUploads,completeUpload} from '../src/server/media-store';
+import {authorizeUploads,completeUpload,cancelUpload} from '../src/server/media-store';
 
 const auth=randomUUID(),household=randomUUID();let db:PGlite;
 const tx:Transaction=fn=>db.transaction(t=>fn(t));
 beforeAll(async()=>{
  db=new PGlite();await db.exec('create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key);');
- for(const name of ['20260907171842_m1_private_events.sql','20260908011410_v1_media.sql'])await db.exec(readFileSync(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+ for(const name of ['20260907171842_m1_private_events.sql','20260908011410_v1_media.sql','20260910055215_raise_media_limit_to_50.sql','20260910070728_raise_media_limit_to_100.sql'])await db.exec(readFileSync(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
  await db.query('insert into auth.users values($1)',[auth]);await db.query('insert into momentnest.households(id,name) values($1,$2)',[household,'保存测试']);
  await db.query('insert into momentnest.subjects(household_id) values($1)',[household]);
  await db.query("insert into momentnest.members(household_id,auth_user_id,label) values($1,$2,'爸爸')",[household,auth]);
@@ -22,8 +22,22 @@ async function files(count:number){
 }
 const input=(ids:string[])=>({requestKey:randomUUID(),title:'',body:'',feeling:'',occurredOn:'2025-08-01',uploadIds:ids});
 describe('batched save transaction',()=>{
- it.each([false,true])('20份附件批量保存，跨天=%s，顺序、任务、幂等性和运行角色权限保持正确',async(split)=>{
-  const ids=await files(20),raw={...input(ids),uploadDates:ids.map((id,i)=>({id,occurredOn:split?`2025-08-${String(i+1).padStart(2,'0')}`:'2025-08-01'}))};
+ it('拒绝101份批量授权和保存',async()=>{
+  await expect(authorizeUploads(tx,auth,Array.from({length:101},()=>({name:'limit.jpg',size:123})))).rejects.toMatchObject({code:'VALIDATION'});
+  await expect(saveEvent(tx,auth,input(Array.from({length:101},()=>randomUUID())))).rejects.toThrow();
+ });
+ it('已有99份可追加至100份，第101份被拒绝且保留原记录',async()=>{
+  const old=await files(99),id=await saveEvent(tx,auth,input(old));
+  const added=await files(1);await saveEvent(tx,auth,{...input(added),id,expectedVersion:1});
+  const extra=await files(1);
+  await expect(saveEvent(tx,auth,{...input(extra),id,expectedVersion:2})).rejects.toMatchObject({code:'VALIDATION'});
+  expect((await db.query('select media_count,version from momentnest.events where id=$1',[id])).rows).toEqual([{media_count:100,version:2}]);
+  expect((await db.query('select state from momentnest.upload_sessions where id=$1',[extra[0]])).rows).toEqual([{state:'verified'}]);
+  await expect(db.query('update momentnest.events set media_count=101,version=version+1 where id=$1',[id])).rejects.toMatchObject({code:'23514',constraint:'events_media_count_check'});
+  await cancelUpload(tx,auth,extra[0]);
+ });
+ it.each([[20,false],[20,true],[50,false],[50,true],[100,false],[100,true]] as const)('%i份附件批量保存，跨天=%s，顺序、任务、幂等性和运行角色权限保持正确',async(count,split)=>{
+  const ids=await files(count),raw={...input(ids),uploadDates:ids.map((id,i)=>({id,occurredOn:split?`2025-08-${String(i%25+1).padStart(2,'0')}`:'2025-08-01'}))};
   let queries=0;const counted:Transaction=fn=>tx(t=>fn({query:async(sql,args)=>{queries++;return t.query(sql,args);}}));
   // Exercise the actual restricted application grants, not a privileged writer.
   await db.exec('set role momentnest_app');let id:string;
@@ -31,8 +45,8 @@ describe('batched save transaction',()=>{
   finally{await db.exec('reset role');}
   const media=await db.query<{upload_session_id:string;position:number;occurred_on:string;event_id:string;state:string}>(`select m.upload_session_id,m.position,m.event_id,e.occurred_on::text,j.state from momentnest.media m
    join momentnest.events e on e.id=m.event_id join momentnest.media_jobs j on j.media_id=m.id where m.upload_session_id=any($1::uuid[])`,[ids]);
-  expect(media.rows).toHaveLength(20);expect(new Set(media.rows.map(m=>m.event_id)).size).toBe(split?20:1);
-  for(const [i,uploadId] of ids.entries())expect(media.rows.find(m=>m.upload_session_id===uploadId)).toMatchObject({position:split?0:i,occurred_on:raw.uploadDates[i].occurredOn,state:'pending'});
+  expect(media.rows).toHaveLength(count);expect(new Set(media.rows.map(m=>m.event_id)).size).toBe(split?Math.min(count,25):1);
+  for(const [i,uploadId] of ids.entries())expect(media.rows.find(m=>m.upload_session_id===uploadId)).toMatchObject({position:split?Math.floor(i/25):i,occurred_on:raw.uploadDates[i].occurredOn,state:'pending'});
   expect((await db.query<{state:string}>('select state from momentnest.upload_sessions where id=any($1::uuid[])',[ids])).rows.every(r=>r.state==='bound')).toBe(true);
   expect((await db.query('select event_id from momentnest.save_requests where request_key=$1',[raw.requestKey])).rows).toEqual([{event_id:id!}]);
  });
