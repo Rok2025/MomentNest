@@ -11,7 +11,7 @@ import { uploadDateReady } from '@/domain/upload-date';
 export type UploadItem={key:string;file:File;id?:string;status:'preparing'|'waiting'|'uploading'|'verifying'|'verified'|'failed';progress:number;uploadedBytes?:number;error?:string;preview?:string;occurredOn?:string;capturedOn?:string|null;capturedText?:string|null;dateEdited?:boolean};
 export function Uploader({items,onChange,disabled,onExpired,date,today}:{items:UploadItem[];onChange:(items:UploadItem[])=>void;disabled:boolean;onExpired:()=>void;date:string;today:string}){
  const details=useRef<HTMLDetailsElement>(null);
- const current=useRef(items);const requests=useRef(new Map<string,AbortController>());const previews=useRef(new Set<string>());const mounted=useRef(true);const [queue]=useState(()=>new UploadQueue(2));
+ const current=useRef(items);const requests=useRef(new Map<string,AbortController>());const previews=useRef(new Set<string>());const mounted=useRef(true);const lastSelection=useRef({signature:'',at:0});const [selectionMessage,setSelectionMessage]=useState('');const [queue]=useState(()=>new UploadQueue(2));
  useEffect(()=>{mounted.current=true;const active=requests.current,urls=previews.current;return()=>{mounted.current=false;queue.clear();active.forEach(x=>x.abort());urls.forEach(u=>URL.revokeObjectURL(u));};},[queue]);
  function present(key:string){return mounted.current&&current.current.some(i=>i.key===key);}
  function patch(key:string,values:Partial<UploadItem>){if(!present(key))return;const next=current.current.map(i=>i.key===key?{...i,...values}:i);current.current=next;onChange(next);}
@@ -54,7 +54,21 @@ export function Uploader({items,onChange,disabled,onExpired,date,today}:{items:U
   }catch(e){for(const item of valid)patch(item.key,{status:'failed',error:(e as Error).message});}
  }
  function retry(item:UploadItem){patch(item.key,{status:'waiting',error:undefined,progress:0});queue.add(item.key,()=>upload(item),item.file.size);}
- function add(files:File[]){const added=files.map(file=>{const problem=fileProblem(file.name,file.size);const preview=!problem&&/^image\/(jpeg|png|webp)$/.test(file.type)?URL.createObjectURL(file):undefined;if(preview)previews.current.add(preview);return {key:crypto.randomUUID(),file,status:problem?'failed':'preparing',progress:0,error:problem,preview} as UploadItem;});const next=[...current.current,...added];current.current=next;onChange(next);void prepare(added);}
+ function add(files:File[]){setSelectionMessage('');const added=files.map(file=>{const problem=fileProblem(file.name,file.size);const preview=!problem&&/^image\/(jpeg|png|webp)$/.test(file.type)?URL.createObjectURL(file):undefined;if(preview)previews.current.add(preview);return {key:crypto.randomUUID(),file,status:problem?'failed':'preparing',progress:0,error:problem,preview} as UploadItem;});const next=[...current.current,...added];current.current=next;onChange(next);void prepare(added);}
+ function handleSelection(input:HTMLInputElement){
+  const files=Array.from(input.files||[]);
+  if(!files.length){
+   if(Date.now()-lastSelection.current.at>1500)setSelectionMessage('没有读取到所选素材，请重新点击“添加照片 / 视频”选择。');
+   return;
+  }
+  const signature=files.map(file=>`${file.name}:${file.size}:${file.lastModified}`).join('|');
+  const now=Date.now();
+  if(signature===lastSelection.current.signature&&now-lastSelection.current.at<1500)return;
+  lastSelection.current={signature,at:now};
+  if(files.length+current.current.length>MAX_FILES){input.setCustomValidity(`每批最多${MAX_FILES}份素材，请减少选择`);input.reportValidity();}
+  else{input.setCustomValidity('');add(files);}
+  input.value='';
+ }
  function remove(item:UploadItem){queue.remove(item.key);requests.current.get(item.key)?.abort();if(item.preview){URL.revokeObjectURL(item.preview);previews.current.delete(item.preview);}const next=current.current.filter(i=>i.key!==item.key);current.current=next;onChange(next);if(item.id)cancel(item.id);}
  const summary=uploadProgress(items);
  const pendingDates=items.filter(item=>item.status==='verified'&&!uploadDateReady(item,today));
@@ -68,7 +82,7 @@ export function Uploader({items,onChange,disabled,onExpired,date,today}:{items:U
    field?.closest('li')?.scrollIntoView({block:'nearest'});
   });
  }
- return <section className="upload-box"><label className="upload-picker">＋ 添加照片 / 视频<input className="sr-only" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.mov,.mp4,.m4v" disabled={disabled||items.length>=MAX_FILES} onChange={e=>{const files=Array.from(e.target.files||[]);if(files.length+items.length>MAX_FILES){e.target.setCustomValidity(`每批最多${MAX_FILES}份素材，请减少选择`);e.target.reportValidity();}else{e.target.setCustomValidity('');add(files);}e.target.value='';}}/></label><details className="upload-help"><summary>格式和大小说明</summary><p className="muted">每批最多{MAX_FILES}份 · 照片50 MB / 视频1 GB · 原件私密保存。Live Photo 请分别选择照片和视频。</p></details>
+ return <section className="upload-box"><label className="upload-picker">＋ 添加照片 / 视频<input className="sr-only" type="file" multiple accept="image/jpeg,image/png,image/webp,image/heic,image/heif,video/quicktime,video/mp4,.jpg,.jpeg,.png,.webp,.heic,.heif,.mov,.mp4,.m4v" disabled={disabled||items.length>=MAX_FILES} onClick={e=>{e.currentTarget.value='';}} onChange={e=>handleSelection(e.currentTarget)} onInput={e=>handleSelection(e.currentTarget)}/></label>{selectionMessage&&<p className="upload-selection-status" role="status" aria-live="polite">{selectionMessage}</p>}<details className="upload-help"><summary>格式和大小说明</summary><p className="muted">每批最多{MAX_FILES}份 · 照片50 MB / 视频1 GB · 原件私密保存。Live Photo 请分别选择照片和视频。</p></details>
  {items.length>0&&<div className="upload-summary" aria-label="整体上传进度">
   <div><strong role="status">已完成 {summary.completed}/{summary.count}</strong><span>{summary.percent}%</span></div>
   <progress aria-label="文件传输总进度" max={100} value={summary.percent}/>
