@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { mkdtemp,mkdir,rm,readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join,dirname } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { randomUUID,createHash } from 'node:crypto';
 import sharp from 'sharp';
 import { beforeAll,beforeEach,afterAll,describe,it,expect,vi } from 'vitest';
 import { saveEvent,listEvents,type Transaction } from '../src/server/event-store';
@@ -18,7 +18,7 @@ let db:PGlite,root:string;
 const tx:Transaction=fn=>db.transaction(t=>fn(t));
 async function event(kind='image',auth=father){
  const u=await authorizeUpload(tx,auth,{name:kind==='image'?'photo.jpg':'clip.mov',size:100});
- await completeUpload(tx,auth,String(u.id),{sha256:'a'.repeat(64),size:100,kind,mime:kind==='image'?'image/jpeg':'video/quicktime'});
+ await completeUpload(tx,auth,String(u.id),{sha256:createHash('sha256').update(String(u.id)).digest('hex'),size:100,kind,mime:kind==='image'?'image/jpeg':'video/quicktime'});
  const id=await saveEvent(tx,auth,{requestKey:randomUUID(),title:'',body:'',feeling:'',occurredOn:'2025-06-01',uploadIds:[String(u.id)]});
  return {id,media:(await listMedia(db,auth,id))[0]};
 }
@@ -26,7 +26,7 @@ const poster=(mediaId:string)=>({previewKey:`derivatives/${mediaId}/poster.jpg`,
 beforeAll(async()=>{
  root=await mkdtemp(join(tmpdir(),'momentnest-preview-'));vi.stubEnv('MEDIA_ROOT',root);vi.stubEnv('MEDIA_SIGNING_SECRET','test-only-preview-signing-'+randomUUID());
  db=new PGlite();await db.exec('create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key);');
- for(const name of ['20260907171842_m1_private_events.sql','20260908011410_v1_media.sql','20260910055215_raise_media_limit_to_50.sql','20260910070728_raise_media_limit_to_100.sql','20260910074242_remove_event_media_count_limit.sql','20260910075100_add_media_time_review_flag.sql','20260910123000_raise_video_limit_to_1gb.sql'])await db.exec(readFileSync(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+ for(const name of ['20260907171842_m1_private_events.sql','20260908011410_v1_media.sql','20260910055215_raise_media_limit_to_50.sql','20260910070728_raise_media_limit_to_100.sql','20260910074242_remove_event_media_count_limit.sql','20260910075100_add_media_time_review_flag.sql','20260910123000_raise_video_limit_to_1gb.sql','20260910150000_upload_drafts_and_hashes.sql'])await db.exec(readFileSync(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
  await db.query('insert into auth.users values($1),($2)',[father,other]);
  await db.query("insert into momentnest.households(id,name) values($1,'test'),($2,'other')",[house,otherHouse]);
  await db.query('insert into momentnest.subjects(household_id) values($1),($2)',[house,otherHouse]);

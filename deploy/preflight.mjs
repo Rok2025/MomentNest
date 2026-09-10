@@ -39,6 +39,10 @@ try {
       const { rows } = await pool.query("select has_table_privilege(current_user,'momentnest.events','delete') as can_delete");
       if (rows[0].can_delete) throw Error();
       if (!worker) {
+        stage = 'upload draft migration';
+        await pool.query('select batch_id,request_key,client_sha256,last_modified,archive_date from momentnest.upload_sessions limit 0');
+        const grants=await pool.query("select has_column_privilege(current_user,'momentnest.upload_sessions','archive_date','UPDATE') and has_column_privilege(current_user,'momentnest.upload_sessions','expires_at','UPDATE') as ok");
+        if(!grants.rows[0].ok)throw Error();
         stage = 'media count migration (unlimited total required)';
         const limit = await pool.query("select pg_get_constraintdef(oid) as definition from pg_constraint where conrelid='momentnest.events'::regclass and conname='events_media_count_check' and convalidated");
         if ((limit.rows[0]?.definition || '').replace(/[\s()]/g, '') !== 'CHECKmedia_count>=0') throw Error();

@@ -1,3 +1,4 @@
+import {savedDuplicate} from '@/server/upload-drafts';
 import { z } from 'zod';
 import { requireIdentity } from '@/server/auth/session';
 import { database,transaction } from '@/server/db';
@@ -11,4 +12,6 @@ export async function POST(req:Request){try{checkOrigin(req);const auth=await re
   originalEvidence(String(u.object_key)).then(evidence=>completeUpload(transaction,auth,id,evidence)),
   readCapture(objectPath(String(u.object_key)),String(u.kind)),
  ]);
- return json({...verified,...capture});}catch(e){return apiFailure(e);}}
+ const fresh=await ownUpload(database(),auth,id);
+ const duplicate=await savedDuplicate(database(),String(u.household_id),String(fresh.sha256),Number(u.expected_size));
+ return json({...verified,...capture,sha256:fresh.sha256,archiveDate:u.archive_date||null,duplicate});}catch(e){return apiFailure(e);}}

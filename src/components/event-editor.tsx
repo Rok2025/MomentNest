@@ -16,7 +16,7 @@ export function EventEditor({initial,today,memberId,media=[],preview=false,mode=
   const editorMode=initial?'mixed':mode;
   const showText=editorMode!=='media',showMedia=editorMode!=='text';
   const [uploads,setUploads]=useState<UploadItem[]>([]),[cover,setCover]=useState<string|null>(initial?.coverMediaId||null);
-  const uploadsReady=uploads.every(u=>u.status==='verified');
+  const uploadsReady=uploads.every(u=>u.status==='verified'&&!u.dateSaving);
   const [date,setDate]=useState(initial?.occurredOn||today),[max,setMax]=useState(today),[body,setBody]=useState([initial?.title,initial?.body,initial?.feeling].filter(Boolean).join('\n\n'));
   const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[needsLogin,setNeedsLogin]=useState(false),[uncertain,setUncertain]=useState(false),[latest,setLatest]=useState<EventRecord|null>(null),[version,setVersion]=useState(initial?.version);
   const attempt=useRef<EventInput|null>(null),saving=useRef(false);
@@ -31,7 +31,7 @@ export function EventEditor({initial,today,memberId,media=[],preview=false,mode=
     if(!attempt.current)attempt.current={requestKey:crypto.randomUUID(),...(initial?{id:initial.id,expectedVersion:version}:{}),occurredOn:date,title:'',body,feeling:'',uploadIds:uploads.map(u=>u.id!),uploadDates:uploads.map(u=>({id:u.id!,occurredOn:u.occurredOn!})),...(initial?{coverMediaId:cover}:{})};
     try{
       const result=await submitEvent(attempt.current);
-      if(result.ok){if(onSaved)onSaved(result.id);else{router.push(`/?saved=1&save=${attempt.current.requestKey}#event-${result.id}`);}return;}
+      if(result.ok){try{sessionStorage.removeItem(`momentnest:upload-page:${memberId}`);}catch{}if(onSaved)onSaved(result.id);else{router.push(`/?saved=1&save=${attempt.current.requestKey}#event-${result.id}`);}return;}
       setMessage(result.message);
       if(result.code==='UNAUTHENTICATED'){setNeedsLogin(true);}
       else if(result.code==='UNAVAILABLE'){setUncertain(true);}
@@ -51,7 +51,7 @@ export function EventEditor({initial,today,memberId,media=[],preview=false,mode=
         <label className="editor-date">记录日期<DateField name="occurredOn" label="记录日期" required min={BIRTHDAY} max={max} value={date} onChange={setDate}/></label>
         {showText&&<><label className="sr-only" htmlFor="memory-body">记录内容</label>
         <textarea id="memory-body" aria-label="记录内容" maxLength={20000} rows={5} value={body} onChange={e=>setBody(e.target.value)} placeholder={editorMode==='text'?'写下这一刻的故事、心情或小小成长…':'写下这一刻，或直接添加照片和视频…'}/></>}
-        {showMedia&&<Uploader items={uploads} onChange={setUploads} date={date} today={max} disabled={preview||busy||uncertain||needsLogin} onExpired={()=>setNeedsLogin(true)}/>}
+        {showMedia&&<Uploader memberId={memberId} items={uploads} onChange={setUploads} date={date} today={max} disabled={preview||busy||uncertain||needsLogin} onExpired={()=>setNeedsLogin(true)}/>}
         {uploads.length>0&&<p className="muted">{editorMode==='media'?'照片和视频按各自日期归档；拍摄日期未知时，必须确认归档日期后保存。':'文字按上方日期保存，照片和视频按各自日期归档；拍摄日期未知时须先确认。'}</p>}
         {media.length>0&&<label>首页封面<select value={cover||''} onChange={e=>setCover(e.target.value||null)}><option value="">第一份素材</option>{media.map(m=><option key={m.id} value={m.id}>{m.filename}</option>)}</select></label>}
       </fieldset>

@@ -1,0 +1,13 @@
+'use client';
+import {useEffect,useState} from 'react';
+import type {DraftBatch,DraftFile} from '@/domain/upload-draft';
+import {formatUploadBytes} from '@/domain/upload-progress';
+export function UploadDrafts({onRestore,disabled}:{onRestore:(batchId:string,files:DraftFile[])=>void;disabled:boolean}){
+ const [batches,setBatches]=useState<DraftBatch[]>([]),[error,setError]=useState(''),[busy,setBusy]=useState(false),[confirm,setConfirm]=useState<string|null>(null),[revision,setRevision]=useState(0);
+ useEffect(()=>{const controller=new AbortController();void fetch('/api/uploads/drafts',{signal:controller.signal,cache:'no-store'}).then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.message);setBatches(d.batches);setError('');}).catch(e=>{if(!controller.signal.aborted)setError(e.message||'暂时无法读取草稿');});return()=>controller.abort();},[revision]);
+ async function restore(id:string){setBusy(true);setError('');try{const r=await fetch(`/api/uploads/drafts?batchId=${id}`,{cache:'no-store'}),d=await r.json();if(!r.ok)throw Error(d.message);if(!d.files.length){setRevision(n=>n+1);throw Error('这批素材已保存、放弃或过期');}onRestore(id,d.files);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+ async function discard(id:string){setBusy(true);setError('');try{const r=await fetch('/api/uploads/drafts',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({batchId:id})});if(!r.ok)throw Error((await r.json()).message);setConfirm(null);setRevision(n=>n+1);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+ if(!batches.length&&!error)return null;
+ return <aside className="upload-drafts"><h2>尚未保存的素材</h2><button type="button" disabled={busy} onClick={()=>setRevision(n=>n+1)}>刷新草稿列表</button><p>已传完的可以恢复；未传完的需重新选择原文件。草稿保留7天，过期后清理。</p>{error&&<p role="alert">{error} <button type="button" onClick={()=>setRevision(n=>n+1)}>刷新草稿列表</button></p>}
+ <ul>{batches.map(b=><li key={b.id}><strong>{b.count} 份素材 · {formatUploadBytes(b.size)}</strong><small>{b.verified} 份传输完成 · {new Date(b.createdAt).toLocaleString('zh-CN')} 创建 · {new Date(b.expiresAt).toLocaleString('zh-CN')} 起到期</small>{b.count>100&&<p>本次先恢复100份，保存后可继续恢复剩余素材。</p>}<div><button type="button" disabled={disabled||busy} onClick={()=>void restore(b.id)}>继续处理</button><button type="button" disabled={disabled||busy} onClick={()=>setConfirm(b.id)}>放弃这批</button></div>{confirm===b.id&&<div role="group" aria-label="确认放弃草稿"><p>放弃这批未保存素材？已保存的回忆不受影响。</p><button type="button" disabled={busy} onClick={()=>void discard(b.id)}>确认放弃</button><button type="button" disabled={busy} onClick={()=>setConfirm(null)}>保留</button></div>}</li>)}</ul></aside>;
+}

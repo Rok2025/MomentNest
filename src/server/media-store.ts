@@ -4,6 +4,7 @@ import { fileKind,fileProblem,MAX_FILES,type MediaRecord } from '../domain/media
 import { memberFor,type Queryable,type Transaction } from './event-store';
 import { previewLinks,playbackLink } from './media-preview';
 import { coverJoin,mediaList } from './media-query';
+import {TEMP_UPLOAD_BYTES} from '../domain/upload-draft';
 export async function authorizeUploads(tx:Transaction,authId:string,files:{name:string;size:number}[]){
  if(!files.length||files.length>MAX_FILES)throw new DomainError('VALIDATION',`每批请选择1至${MAX_FILES}份素材`);
  for(const file of files){const problem=fileProblem(file.name,file.size);if(problem||file.name.length>255)throw new DomainError('VALIDATION',problem||'文件名过长');}
@@ -11,13 +12,13 @@ export async function authorizeUploads(tx:Transaction,authId:string,files:{name:
   const m=await memberFor(db,authId);
   await db.query('select pg_advisory_xact_lock(hashtextextended($1,0))',[`uploads:${m.id}`]);
   const ids=files.map(()=>randomUUID());
-  // One insert for the whole selection; the member lock keeps the quota atomic.
-  const r=await db.query(`insert into momentnest.upload_sessions(id,household_id,member_id,object_key,filename,kind,expected_size)
-   select f.id,$1,$2,f.key,f.name,f.kind,f.size
+  // One insert for the whole selection; the member lock keeps the temporary byte budget atomic.
+  const r=await db.query(`insert into momentnest.upload_sessions(id,household_id,member_id,object_key,filename,kind,expected_size,batch_id)
+   select f.id,$1,$2,f.key,f.name,f.kind,f.size,$10::uuid
    from unnest($3::uuid[],$4::text[],$5::text[],$6::text[],$7::bigint[]) as f(id,key,name,kind,size)
-   where (select count(*) from momentnest.upload_sessions where member_id=$2 and state in ('authorized','verified') and expires_at>clock_timestamp())+$8<=100 returning *`,
-   [m.householdId,m.id,ids,ids.map(id=>`originals/${m.householdId}/${id}.bin`),files.map(f=>f.name),files.map(f=>fileKind(f.name)),files.map(f=>f.size),files.length]);
-  if(r.rows.length!==files.length)throw new DomainError('VALIDATION','未保存素材较多，请先保存或移除当前选择');
+   where (select coalesce(sum(expected_size),0) from momentnest.upload_sessions where member_id=$2 and state in ('authorized','verified') and expires_at>clock_timestamp())+$8<=$9 returning *`,
+   [m.householdId,m.id,ids,ids.map(id=>`originals/${m.householdId}/${id}.bin`),files.map(f=>f.name),files.map(f=>fileKind(f.name)),files.map(f=>f.size),files.reduce((n,f)=>n+f.size,0),TEMP_UPLOAD_BYTES,randomUUID()]);
+  if(r.rows.length!==files.length)throw new DomainError('VALIDATION','未保存素材已接近10 GB，请在草稿列表中保存或放弃旧素材后继续');
   return ids.map(id=>r.rows.find(row=>row.id===id)!);
  });
 }
@@ -27,25 +28,31 @@ export async function authorizeUpload(tx:Transaction,authId:string,input:{name:s
  return tx(async db=>{
   const m=await memberFor(db,authId);
   await db.query('select pg_advisory_xact_lock(hashtextextended($1,0))',[`uploads:${m.id}`]);
-  const r=await db.query("select * from momentnest.upload_sessions where id=$1 and household_id=$2 and member_id=$3 and state in ('authorized','verified') and expires_at>clock_timestamp()+interval '1 minute'",[input.id,m.householdId,m.id]);
+  const r=await db.query("select *,archive_date::text as archive_date from momentnest.upload_sessions where id=$1 and household_id=$2 and member_id=$3 and state in ('authorized','verified') and expires_at>clock_timestamp()+interval '1 minute'",[input.id,m.householdId,m.id]);
   const row=r.rows[0];if(!row||row.filename!==input.name||Number(row.expected_size)!==input.size)throw new DomainError('VALIDATION','上传已取消或过期，请移除后重新选择文件');return row;
  });
 }
-export async function ownUpload(db:Queryable,authId:string,id:string){const m=await memberFor(db,authId);const r=await db.query('select * from momentnest.upload_sessions where id=$1 and household_id=$2 and member_id=$3',[id,m.householdId,m.id]);if(!r.rows[0])throw new DomainError('NOT_FOUND','没有找到这份上传');return r.rows[0];}
+export async function ownUpload(db:Queryable,authId:string,id:string){const m=await memberFor(db,authId);const r=await db.query('select *,archive_date::text as archive_date from momentnest.upload_sessions where id=$1 and household_id=$2 and member_id=$3',[id,m.householdId,m.id]);if(!r.rows[0])throw new DomainError('NOT_FOUND','没有找到这份上传');return r.rows[0];}
 export async function completeUpload(tx:Transaction,authId:string,id:string,evidence:{sha256:string;size:number;kind:string;mime:string}){
- return tx(async db=>{const m=await memberFor(db,authId);const r=await db.query('select * from momentnest.upload_sessions where id=$1 and household_id=$2 and member_id=$3 for update',[id,m.householdId,m.id]);const u=r.rows[0];
+ return tx(async db=>{const m=await memberFor(db,authId);const r=await db.query('select *,archive_date::text as archive_date from momentnest.upload_sessions where id=$1 and household_id=$2 and member_id=$3 for update',[id,m.householdId,m.id]);const u=r.rows[0];
   if(!u||!['authorized','verified'].includes(String(u.state))||new Date(String(u.expires_at)).valueOf()<=Date.now())throw new DomainError('VALIDATION','上传已失效，请重新选择文件');
   if(evidence.size!==Number(u.expected_size)||evidence.kind!==u.kind||!/^[a-f0-9]{64}$/.test(evidence.sha256))throw new DomainError('VALIDATION','原件格式或大小校验失败');
+  if(u.client_sha256&&u.client_sha256!==evidence.sha256)throw new DomainError('VALIDATION','文件内容与选择时不一致，请移除后重新选择');
   if(u.sha256&&u.sha256!==evidence.sha256)throw new DomainError('VALIDATION','原件校验值发生变化');
   await db.query("update momentnest.upload_sessions set state='verified',sha256=$1,mime=$2 where id=$3",[evidence.sha256,evidence.mime,id]);return {id,verified:true};
  });
 }
-export async function cancelUpload(tx:Transaction,authId:string,id:string){return tx(async db=>{const m=await memberFor(db,authId);await db.query("update momentnest.upload_sessions set state='cancelled' where id=$1 and household_id=$2 and member_id=$3 and state in ('authorized','verified')",[id,m.householdId,m.id]);});}
+export async function cancelUpload(tx:Transaction,authId:string,id:string){return tx(async db=>{const m=await memberFor(db,authId);await db.query("update momentnest.upload_sessions set state='cancelled',expires_at=clock_timestamp()+interval '1 hour' where id=$1 and household_id=$2 and member_id=$3 and state in ('authorized','verified')",[id,m.householdId,m.id]);});}
 export async function lockUploads(db:Queryable,m:Member,ids:string[]){
  if(new Set(ids).size!==ids.length||ids.length>MAX_FILES)throw new DomainError('VALIDATION',`所选文件重复或数量超过${MAX_FILES}份`);
  if(!ids.length)return [];
+ await db.query('select pg_advisory_xact_lock(hashtextextended($1,0))',[`media-content:${m.householdId}`]);
  const {rows}=await db.query('select * from momentnest.upload_sessions where id=any($1::uuid[]) order by id for update',[ids]);
  if(rows.length!==ids.length||rows.some(u=>u.household_id!==m.householdId||u.member_id!==m.id||u.state!=='verified'||new Date(String(u.expires_at)).valueOf()<=Date.now()))throw new DomainError('VALIDATION','部分素材未验证、已失效或不属于当前账号，请重新上传');
+ const hashes=rows.map(u=>`${u.sha256}:${u.expected_size}`);
+ if(new Set(hashes).size!==hashes.length)throw new DomainError('VALIDATION','本批包含内容完全相同的素材，请移除重复项后保存');
+ const saved=await db.query('select m.id from momentnest.media m join momentnest.upload_sessions u on m.sha256=u.sha256 and m.size=u.expected_size where m.household_id=$1 and u.id=any($2::uuid[]) limit 1',[m.householdId,ids]);
+ if(saved.rows.length)throw new DomainError('CONFLICT','部分素材已收录，请重新校验素材，跳过重复项后保存');
  return ids.map(id=>rows.find(u=>u.id===id)!);
 }
 export async function bindUploads(db:Queryable,m:Member,eventId:string,uploads:Record<string,unknown>[],offset:number){
