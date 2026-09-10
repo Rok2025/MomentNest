@@ -25,7 +25,7 @@ export function storageServer(){
    if(t.operation==='put'&&(req.method==='HEAD'||req.method==='POST'||(req.method==='PUT'&&req.headers['content-range']))){
     // Same-origin browser HEAD omits Origin. Only signed, read-only progress queries may omit it.
     const originAllowed=req.headers.origin===allowed||(req.method==='HEAD'&&req.headers.origin===undefined);
-    if(!originAllowed||!t.size||!Number.isSafeInteger(t.size)||t.size>524288000||t.size<=0)throw Error('FORBIDDEN');
+    if(!originAllowed||!t.size||!Number.isSafeInteger(t.size)||t.size>1073741824||t.size<=0)throw Error('FORBIDDEN');
     if(active.has(t.key)||inFlight>=3){res.writeHead(409).end();return;}
     key=t.key;active.add(key);inFlight++;
     const state=await resumeState(path,t.size);
@@ -46,7 +46,7 @@ export function storageServer(){
    }
    if(req.method==='PUT'&&t.operation==='put'){
     if(req.headers.origin!==allowed)throw Error('FORBIDDEN');
-    if(!t.size||t.size>524288000||t.size<=0||Number(req.headers['content-length'])!==t.size)throw Error('WRONG_SIZE');
+    if(!t.size||t.size>1073741824||t.size<=0||Number(req.headers['content-length'])!==t.size)throw Error('WRONG_SIZE');
     if(active.has(t.key)||inFlight>=3){res.writeHead(409).end();return;}key=t.key;active.add(key);inFlight++;
     await mkdir(dirname(path),{recursive:true,mode:0o700});const disk=await statfs(storageRoot());if(disk.bavail*disk.bsize<t.size+1073741824)throw Error('DISK_FULL');
     try{await stat(path);res.writeHead(409).end();return;}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}

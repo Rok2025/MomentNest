@@ -5,13 +5,14 @@ import { fileHash } from './storage/local';
 import type { Queryable } from './event-store';
 export const backupTables=['households','members','subjects','events','upload_sessions','media','media_jobs','save_requests'] as const;
 export type Snapshot={version:1;createdAt:string;tables:Record<string,Record<string,unknown>[]>;files:{key:string;sha256:string;size:number}[];note:string};
-export async function exportSnapshot(db:Queryable,folder:string,mediaRoot:string){
+export async function exportSnapshot(db:Queryable,folder:string,mediaRoot:string,householdId?:string){
  await mkdir(folder,{recursive:false,mode:0o700});
  // SQL DATE is a calendar day, never a JS Date. pg otherwise serializes local
  // midnight to the previous UTC day on this Mac (Asia/Shanghai).
  const tables:Snapshot['tables']={};for(const t of backupTables){
   const dateColumn=t==='subjects'?'birth_date':t==='events'?'occurred_on':null;
-  tables[t]=(await db.query(`select *${dateColumn?`, ${dateColumn}::text as ${dateColumn}`:''} from momentnest.${t}`)).rows;
+  const scoped=householdId ? (t==='households' ? ' where id=$1' : t==='media_jobs' ? ' where media_id in (select id from momentnest.media where household_id=$1)' : ' where household_id=$1') : '';
+  tables[t]=(await db.query(`select *${dateColumn?`, ${dateColumn}::text as ${dateColumn}`:''} from momentnest.${t}${scoped}`,householdId?[householdId]:[])).rows;
  }
  // Only committed originals; temporary uploads are not a long-term backup asset.
  const files:Snapshot['files']=[];

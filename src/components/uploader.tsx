@@ -68,7 +68,7 @@ export function Uploader({items,onChange,disabled,onExpired,date,today}:{items:U
    field?.closest('li')?.scrollIntoView({block:'nearest'});
   });
  }
- return <section className="upload-box"><label className="upload-picker">＋ 添加照片 / 视频<input className="sr-only" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.mov,.mp4,.m4v" disabled={disabled||items.length>=MAX_FILES} onChange={e=>{const files=Array.from(e.target.files||[]);if(files.length+items.length>MAX_FILES){e.target.setCustomValidity(`每批最多${MAX_FILES}份素材，请减少选择`);e.target.reportValidity();}else{e.target.setCustomValidity('');add(files);}e.target.value='';}}/></label><details className="upload-help"><summary>格式和大小说明</summary><p className="muted">每批最多{MAX_FILES}份 · 照片50 MB / 视频500 MB · 原件私密保存。Live Photo 请分别选择照片和视频。</p></details>
+ return <section className="upload-box"><label className="upload-picker">＋ 添加照片 / 视频<input className="sr-only" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.mov,.mp4,.m4v" disabled={disabled||items.length>=MAX_FILES} onChange={e=>{const files=Array.from(e.target.files||[]);if(files.length+items.length>MAX_FILES){e.target.setCustomValidity(`每批最多${MAX_FILES}份素材，请减少选择`);e.target.reportValidity();}else{e.target.setCustomValidity('');add(files);}e.target.value='';}}/></label><details className="upload-help"><summary>格式和大小说明</summary><p className="muted">每批最多{MAX_FILES}份 · 照片50 MB / 视频1 GB · 原件私密保存。Live Photo 请分别选择照片和视频。</p></details>
  {items.length>0&&<div className="upload-summary" aria-label="整体上传进度">
   <div><strong role="status">已完成 {summary.completed}/{summary.count}</strong><span>{summary.percent}%</span></div>
   <progress aria-label="文件传输总进度" max={100} value={summary.percent}/>

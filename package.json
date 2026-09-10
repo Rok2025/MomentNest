@@ -13,7 +13,7 @@
     "db:check": "node --env-file-if-exists=.env.local scripts/check-db.mjs",
     "media:serve": "tsx --env-file=.env.local workers/storage.ts",
     "media:worker": "tsx --env-file=.env.local workers/media.ts",
-    "backup": "tsx --env-file=.env.local scripts/backup.ts",
+    "backup": "tsx --env-file-if-exists=.env.local scripts/backup.ts",
     "restore:check": "tsx scripts/restore-check.ts",
     "start:local": "tsx --env-file=.env.local scripts/start-local.ts"
   },
