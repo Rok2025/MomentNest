@@ -51,7 +51,7 @@ export function EventEditor({initial,today,memberId,media=[],preview=false,mode=
         <label className="editor-date">记录日期<DateField name="occurredOn" label="记录日期" required min={BIRTHDAY} max={max} value={date} onChange={setDate}/></label>
         {showText&&<><label className="sr-only" htmlFor="memory-body">记录内容</label>
         <textarea id="memory-body" aria-label="记录内容" maxLength={20000} rows={5} value={body} onChange={e=>setBody(e.target.value)} placeholder={editorMode==='text'?'写下这一刻的故事、心情或小小成长…':'写下这一刻，或直接添加照片和视频…'}/></>}
-        {showMedia&&<Uploader items={uploads} onChange={setUploads} date={date} today={max} disabled={preview||busy||uncertain||needsLogin} existing={initial?.mediaCount||0} onExpired={()=>setNeedsLogin(true)}/>}
+        {showMedia&&<Uploader items={uploads} onChange={setUploads} date={date} today={max} disabled={preview||busy||uncertain||needsLogin} onExpired={()=>setNeedsLogin(true)}/>}
         {uploads.length>0&&<p className="muted">{editorMode==='media'?'照片和视频按各自日期归档；拍摄日期未知时，必须确认归档日期后保存。':'文字按上方日期保存，照片和视频按各自日期归档；拍摄日期未知时须先确认。'}</p>}
         {media.length>0&&<label>首页封面<select value={cover||''} onChange={e=>setCover(e.target.value||null)}><option value="">第一份素材</option>{media.map(m=><option key={m.id} value={m.id}>{m.filename}</option>)}</select></label>}
       </fieldset>

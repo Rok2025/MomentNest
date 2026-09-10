@@ -12,7 +12,7 @@ for(const file of snapshot.files){const target=join(dest,'media',file.key);await
 const db=new PGlite(join(dest,'database'));
 try{
  await db.exec('create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key);');
- for(const name of ['20260907171842_m1_private_events.sql','20260908011410_v1_media.sql','20260910055215_raise_media_limit_to_50.sql','20260910070728_raise_media_limit_to_100.sql'])await db.exec(readFileSync(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+ for(const name of ['20260907171842_m1_private_events.sql','20260908011410_v1_media.sql','20260910055215_raise_media_limit_to_50.sql','20260910070728_raise_media_limit_to_100.sql','20260910074242_remove_event_media_count_limit.sql'])await db.exec(readFileSync(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
  await db.transaction(async t=>{
   for(const m of snapshot.tables.members)await t.query('insert into auth.users values($1) on conflict do nothing',[m.auth_user_id]);
   // Preserve original identity/time during restore; re-enable before validation.

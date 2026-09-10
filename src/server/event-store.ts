@@ -4,7 +4,6 @@ import { bindUploadGroups,type UploadGroup } from './save-media';
 import { createHash,randomUUID } from 'node:crypto';
 import { DomainError, inputSchema, type EventRecord, type Member } from '../domain/events';
 import { validEventDate, todayShanghai } from '../domain/dates';
-import { MAX_FILES } from '../domain/media';
 import type { DayCount } from '../domain/heatmap';
 export interface Queryable { query(text: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }> }
 export type Transaction = <T>(fn: (db: Queryable) => Promise<T>) => Promise<T>;
@@ -82,7 +81,6 @@ export async function saveEvent(transaction: Transaction, authId: string, raw: u
       const current=await db.query('select media_count from momentnest.events where household_id=$1 and id=$2 for update',[m.householdId,input.id]);
       if(!current.rows[0])throw new DomainError('NOT_FOUND','没有找到这条回忆');
       offset=Number(current.rows[0].media_count);
-      if(offset+uploads.length>MAX_FILES)throw new DomainError('VALIDATION',`每条回忆最多${MAX_FILES}份素材`);
       if(!input.body&&!input.feeling&&!offset&&!uploads.length)throw new DomainError('VALIDATION','记录不能是空的');
       if(input.coverMediaId){const cover=await db.query('select id from momentnest.media where household_id=$1 and event_id=$2 and id=$3',[m.householdId,input.id,input.coverMediaId]);if(!cover.rows[0])throw new DomainError('VALIDATION','封面必须属于这条回忆');}
       const result=await db.query(`update momentnest.events set title=$1,body=$2,feeling=$3,occurred_on=$4,updated_by=$5,version=version+1,media_count=$9,cover_media_id=case when $10::boolean then $11::uuid else cover_media_id end where household_id=$6 and id=$7 and version=$8 returning id`,[input.title,input.body,input.feeling,input.occurredOn,m.id,m.householdId,input.id,input.expectedVersion,offset+uploads.length,input.coverMediaId!==undefined,input.coverMediaId||null]);

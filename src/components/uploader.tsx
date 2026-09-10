@@ -9,7 +9,7 @@ import { fileProblem,MAX_FILES } from '@/domain/media';
 import { BIRTHDAY,validEventDate } from '@/domain/dates';
 import { uploadDateReady } from '@/domain/upload-date';
 export type UploadItem={key:string;file:File;id?:string;status:'preparing'|'waiting'|'uploading'|'verifying'|'verified'|'failed';progress:number;uploadedBytes?:number;error?:string;preview?:string;occurredOn?:string;capturedOn?:string|null;capturedText?:string|null;dateEdited?:boolean};
-export function Uploader({items,onChange,disabled,existing=0,onExpired,date,today}:{items:UploadItem[];onChange:(items:UploadItem[])=>void;disabled:boolean;existing?:number;onExpired:()=>void;date:string;today:string}){
+export function Uploader({items,onChange,disabled,onExpired,date,today}:{items:UploadItem[];onChange:(items:UploadItem[])=>void;disabled:boolean;onExpired:()=>void;date:string;today:string}){
  const details=useRef<HTMLDetailsElement>(null);
  const current=useRef(items);const requests=useRef(new Map<string,AbortController>());const previews=useRef(new Set<string>());const mounted=useRef(true);const [queue]=useState(()=>new UploadQueue(2));
  useEffect(()=>{mounted.current=true;const active=requests.current,urls=previews.current;return()=>{mounted.current=false;queue.clear();active.forEach(x=>x.abort());urls.forEach(u=>URL.revokeObjectURL(u));};},[queue]);
@@ -68,7 +68,7 @@ export function Uploader({items,onChange,disabled,existing=0,onExpired,date,toda
    field?.closest('li')?.scrollIntoView({block:'nearest'});
   });
  }
- return <section className="upload-box"><label className="upload-picker">＋ 添加照片 / 视频<input className="sr-only" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.mov,.mp4,.m4v" disabled={disabled||existing+items.length>=MAX_FILES} onChange={e=>{const files=Array.from(e.target.files||[]);if(files.length+items.length+existing>MAX_FILES){e.target.setCustomValidity(`每条最多${MAX_FILES}份素材，请减少选择`);e.target.reportValidity();}else{e.target.setCustomValidity('');add(files);}e.target.value='';}}/></label><details className="upload-help"><summary>格式和大小说明</summary><p className="muted">每条最多{MAX_FILES}份 · 照片50 MB / 视频500 MB · 原件私密保存。Live Photo 请分别选择照片和视频。</p></details>
+ return <section className="upload-box"><label className="upload-picker">＋ 添加照片 / 视频<input className="sr-only" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.mov,.mp4,.m4v" disabled={disabled||items.length>=MAX_FILES} onChange={e=>{const files=Array.from(e.target.files||[]);if(files.length+items.length>MAX_FILES){e.target.setCustomValidity(`每批最多${MAX_FILES}份素材，请减少选择`);e.target.reportValidity();}else{e.target.setCustomValidity('');add(files);}e.target.value='';}}/></label><details className="upload-help"><summary>格式和大小说明</summary><p className="muted">每批最多{MAX_FILES}份 · 照片50 MB / 视频500 MB · 原件私密保存。Live Photo 请分别选择照片和视频。</p></details>
  {items.length>0&&<div className="upload-summary" aria-label="整体上传进度">
   <div><strong role="status">已完成 {summary.completed}/{summary.count}</strong><span>{summary.percent}%</span></div>
   <progress aria-label="文件传输总进度" max={100} value={summary.percent}/>
