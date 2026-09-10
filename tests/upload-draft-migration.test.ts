@@ -2,6 +2,9 @@ import {PGlite} from '@electric-sql/pglite';
 import {readFileSync,readdirSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {it,expect} from 'vitest';
+import {draftBatchIdSchema} from '../src/domain/upload-draft';
+import {draftFiles,discardDraft} from '../src/server/upload-drafts';
+import type {Transaction} from '../src/server/event-store';
 it('迁移保留已有未验证及已验证原件的记录与哈希，延长恢复期限',async()=>{
  const db=new PGlite(),auth=randomUUID(),house=randomUUID(),member=randomUUID();
  try{
@@ -14,5 +17,12 @@ it('迁移保留已有未验证及已验证原件的记录与哈希，延长恢�
   const {rows}=await db.query<{object_key:string;state:string;sha256:string|null;batch_id:string;expires_at:Date}>('select object_key,state,sha256,batch_id,expires_at from momentnest.upload_sessions order by filename');
   expect(rows).toHaveLength(2);expect(rows[0]).toMatchObject({object_key:'originals/keep-a.bin',state:'authorized',sha256:null});expect(rows[1]).toMatchObject({object_key:'originals/keep-b.bin',state:'verified',sha256:'a'.repeat(64)});
   expect(rows.every(r=>r.batch_id&&new Date(r.expires_at).valueOf()>Date.now()+6*86400000)).toBe(true);
+  for(const batchId of new Set(rows.map(r=>r.batch_id))){
+   expect(draftBatchIdSchema.parse(batchId)).toBe(batchId);
+   expect((await draftFiles(db,auth,batchId)).length).toBeGreaterThan(0);
+   const tx:Transaction=fn=>db.transaction(fn);
+   await discardDraft(tx,auth,batchId);
+   expect(await draftFiles(db,auth,batchId)).toEqual([]);
+  }
  }finally{await db.close();}
 });

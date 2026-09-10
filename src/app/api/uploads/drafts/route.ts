@@ -4,12 +4,13 @@ import {requireIdentity} from '@/server/auth/session';
 import {json,apiFailure,checkOrigin} from '@/server/http';
 import {draftBatches,draftFiles,discardDraft,draftDate} from '@/server/upload-drafts';
 import {validEventDate,todayShanghai} from '@/domain/dates';
+import {draftBatchIdSchema} from '@/domain/upload-draft';
 export async function GET(req:Request){try{
  const auth=await requireIdentity(),batchId=new URL(req.url).searchParams.get('batchId');
- return json(batchId?{files:await draftFiles(database(),auth,z.string().uuid().parse(batchId))}:{batches:await draftBatches(database(),auth)});
+ return json(batchId?{files:await draftFiles(database(),auth,draftBatchIdSchema.parse(batchId))}:{batches:await draftBatches(database(),auth)});
 }catch(e){return apiFailure(e);}}
 export async function DELETE(req:Request){try{
- checkOrigin(req);const {batchId}=z.object({batchId:z.string().uuid()}).strict().parse(await req.json());
+ checkOrigin(req);const {batchId}=z.object({batchId:draftBatchIdSchema}).strict().parse(await req.json());
  await discardDraft(transaction,await requireIdentity(),batchId);return json({ok:true});
 }catch(e){return apiFailure(e);}}
 export async function PATCH(req:Request){try{
