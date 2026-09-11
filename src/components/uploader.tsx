@@ -13,8 +13,6 @@ import {uploadDateReady} from '@/domain/upload-date';
 import type {DraftFile,DuplicateMedia} from '@/domain/upload-draft';
 export type UploadItem={key:string;file:{name:string;size:number;type?:string;lastModified?:number};blob?:File;id?:string;sha256?:string;status:'hashing'|'preparing'|'waiting'|'uploading'|'verifying'|'verified'|'failed';progress:number;uploadedBytes?:number;error?:string;occurredOn?:string;capturedOn?:string|null;capturedText?:string|null;dateEdited?:boolean;dateSaving?:boolean;reused?:boolean;requestKey?:string};
 type Ticket=UploadAuth&{name?:string;duplicate?:DuplicateMedia;reused?:boolean;archiveDate?:string|null};
-// Keep the original picker configuration: the image/* trial showed no speedup
-// on the user's iPhone and a subsequent selection had missing items.
 const accept='image/jpeg,image/png,image/webp,image/heic,image/heif,video/quicktime,video/mp4,.jpg,.jpeg,.png,.webp,.heic,.heif,.mov,.mp4,.m4v';
 export function Uploader({items,onChange,disabled,onExpired,date,today,memberId}:{items:UploadItem[];onChange:(items:UploadItem[])=>void;disabled:boolean;onExpired:()=>void;date:string;today:string;memberId:string}){
  const details=useRef<HTMLDetailsElement>(null),current=useRef(items),mounted=useRef(true),batchId=useRef(''),controllers=useRef(new Map<string,AbortController>()),serial=useRef(Promise.resolve());

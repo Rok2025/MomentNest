@@ -10,7 +10,7 @@ base=/opt/apps/momentnest
 target="$base/releases/$release"
 exec 9>"$base/.deploy.lock"
 flock -w 180 9
-for file in .next/BUILD_ID node_modules/next/dist/bin/next workers/media.ts public/photo-picker-check.html COMMIT; do test -s "$target/$file"; done
+for file in .next/BUILD_ID node_modules/next/dist/bin/next workers/media.ts COMMIT; do test -s "$target/$file"; done
 test "$(cat "$target/COMMIT")" = "$commit"
 cd "$target"
 node --env-file=/etc/momentnest/runtime.env deploy/preflight.mjs

@@ -31,15 +31,10 @@ export PATH="$sandbox/bin:$PATH"
 commit=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 release=gha-1-1-$commit
 target="$sandbox/app/releases/$release"
-mkdir -p "$target/.next" "$target/node_modules/next/dist/bin" "$target/workers" "$target/public"
+mkdir -p "$target/.next" "$target/node_modules/next/dist/bin" "$target/workers"
 for file in .next/BUILD_ID node_modules/next/dist/bin/next workers/media.ts; do echo fixture > "$target/$file"; done
 echo "$commit" > "$target/COMMIT"
 ln -s "$sandbox/app/releases/previous" "$sandbox/app/current"
-# Missing public assets must be rejected before switching or restarting services.
-if bash "$sandbox/activate.sh" "$release" "$commit"; then exit 1; fi
-test "$(readlink "$sandbox/app/current")" = "$sandbox/app/releases/previous"
-test ! -e "$sandbox/services.log"
-echo fixture > "$target/public/photo-picker-check.html"
 if FAIL_STAGE=preflight bash "$sandbox/activate.sh" "$release" "$commit"; then exit 1; fi
 test "$(readlink "$sandbox/app/current")" = "$sandbox/app/releases/previous"
 test ! -e "$sandbox/services.log"
@@ -53,4 +48,4 @@ if FAIL_STAGE=public bash "$sandbox/activate.sh" "$release" "$commit"; then exit
 test ! -e "$sandbox/app/current"
 tail -1 "$sandbox/services.log" | grep -q 'systemctl stop'
 if bash "$sandbox/activate.sh" '../escape' "$commit"; then exit 1; fi
-echo 'Activation contracts passed: missing public asset, preflight, rollback, success, first-release failure, invalid release.'
+echo 'Activation contracts passed: preflight, rollback, success, first-release failure, invalid release.'
