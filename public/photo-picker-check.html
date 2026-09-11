@@ -18,20 +18,18 @@
 </head>
 <body>
 <main>
-  <h1>照片选择对比</h1>
-  <p>用同一组本机照片，比较点 ✅ 后、回到此页前的等待。</p>
-  <p class="muted">先选 5–10 张照片，不混选视频。分别尝试 A、B，之后交换顺序再试，减少系统缓存对比较的影响。C 用来单独检查照片入口。</p>
+  <h1>照片选择对比已暂停</h1>
+  <p>本次 iPhone 对比未观察到明显提速，B、C 测试入口已停用。正式上传已恢复 A 的原配置。</p>
+  <p class="muted">如果原照片在 iPhone“照片”App 中可见，但选择窗口看不到，请先退出该窗口，检查是否选择了特定相册、搜索条件或筛选条件。当前仍需确认原因，恢复配置不代表已经修复系统选择窗口。</p>
   <p class="muted">本页不上传、预览或计算文件指纹，只显示系统返回的文件名、格式和大小。系统仍可能导出或转换文件。关闭页面后结果不保留。</p>
   <div id="cases"></div>
   <button type="button" id="clear">清空对比结果</button>
-  <p class="muted">网页无法得知你在系统相册里点击 ✅ 的时刻，因此不把包含挑选时间的总时长冒充准备耗时。请观察并记录那段等待；格式或大小变化也可辅助判断是否发生转换。</p>
+  <p class="muted">保留 A 入口用于检查原配置能否看到素材，不会上传文件。</p>
 </main>
 <script>
   const original='image/jpeg,image/png,image/webp,image/heic,image/heif,video/quicktime,video/mp4,.jpg,.jpeg,.png,.webp,.heic,.heif,.mov,.mp4,.m4v';
   const cases=[
     {name:'A · 调整前',description:'原来的照片 / 视频选择配置。',accept:original},
-    {name:'B · 本次调整',description:'允许系统优先交付现有图片格式，保留原来的具体格式声明。是否减少转换取决于 iOS 和浏览器。',accept:'image/*,'+original},
-    {name:'C · 仅照片',description:'只显示照片，用来对比照片专用入口。',accept:'image/*'},
   ];
   const results=[];
   for(const item of cases){
