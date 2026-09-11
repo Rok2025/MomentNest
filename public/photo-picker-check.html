@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>照片选择对比 · MomentNest</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f8f6f0;color:#344334;font:16px/1.7 system-ui,sans-serif}
+    main{max-width:680px;margin:32px auto;padding:0 16px}h1{font-size:25px;line-height:1.4}h2{font-size:18px;margin:0 0 6px}
+    p{margin:8px 0;overflow-wrap:anywhere}.muted,small{color:#697565;font-size:13px}section{margin:18px 0;padding:18px;border:1px solid #d8dfd0;border-radius:14px;background:#fffef9}
+    .picker{display:block;position:relative;margin-top:14px;padding:10px 14px;min-height:44px;border:1px solid #b9c9ac;border-radius:10px;background:#e7efdf;text-align:center;cursor:pointer}
+    .picker:focus-within{outline:3px solid #86a075;outline-offset:3px}.picker input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+    button{font:inherit;min-height:44px;padding:8px 16px;border:1px solid #d8dfd0;border-radius:10px;background:#fffef9;color:inherit;cursor:pointer}
+    output{display:block;margin-top:12px;font-size:14px}ul{list-style:none;padding:0;margin:8px 0;max-height:260px;overflow:auto}li{padding:6px 0;border-top:1px solid #e7efdf;overflow-wrap:anywhere;font-size:13px}li small{display:block}
+  </style>
+</head>
+<body>
+<main>
+  <h1>照片选择对比</h1>
+  <p>用同一组本机照片，比较点 ✅ 后、回到此页前的等待。</p>
+  <p class="muted">先选 5–10 张照片，不混选视频。分别尝试 A、B，之后交换顺序再试，减少系统缓存对比较的影响。C 用来单独检查照片入口。</p>
+  <p class="muted">本页不上传、预览或计算文件指纹，只显示系统返回的文件名、格式和大小。系统仍可能导出或转换文件。关闭页面后结果不保留。</p>
+  <div id="cases"></div>
+  <button type="button" id="clear">清空对比结果</button>
+  <p class="muted">网页无法得知你在系统相册里点击 ✅ 的时刻，因此不把包含挑选时间的总时长冒充准备耗时。请观察并记录那段等待；格式或大小变化也可辅助判断是否发生转换。</p>
+</main>
+<script>
+  const original='image/jpeg,image/png,image/webp,image/heic,image/heif,video/quicktime,video/mp4,.jpg,.jpeg,.png,.webp,.heic,.heif,.mov,.mp4,.m4v';
+  const cases=[
+    {name:'A · 调整前',description:'原来的照片 / 视频选择配置。',accept:original},
+    {name:'B · 本次调整',description:'允许系统优先交付现有图片格式，保留原来的具体格式声明。是否减少转换取决于 iOS 和浏览器。',accept:'image/*,'+original},
+    {name:'C · 仅照片',description:'只显示照片，用来对比照片专用入口。',accept:'image/*'},
+  ];
+  const results=[];
+  for(const item of cases){
+    const section=document.createElement('section');
+    const heading=document.createElement('h2');heading.textContent=item.name;
+    const description=document.createElement('p');description.className='muted';description.textContent=item.description;
+    const label=document.createElement('label');label.className='picker';label.append('选择同一组照片');
+    const input=document.createElement('input');input.type='file';input.multiple=true;input.accept=item.accept;input.setAttribute('aria-label',item.name+'：选择照片');
+    const output=document.createElement('output');output.setAttribute('aria-live','polite');
+    const list=document.createElement('ul');
+    const reset=()=>{input.value='';output.textContent='';list.replaceChildren();};results.push(reset);
+    input.addEventListener('change',()=>{
+      const files=Array.from(input.files||[]);input.value='';list.replaceChildren();
+      if(!files.length){output.textContent='未收到文件。';return;}
+      const size=files.reduce((total,file)=>total+file.size,0);
+      output.textContent='已收到 '+files.length+' 份 · '+(size/1024/1024).toFixed(2)+' MB · 未上传';
+      for(const file of files){
+        const row=document.createElement('li');row.textContent=file.name;
+        const metadata=document.createElement('small');metadata.textContent=(file.type||'格式未提供')+' · '+(file.size/1024/1024).toFixed(2)+' MB';
+        row.append(metadata);list.append(row);
+      }
+    });
+    input.addEventListener('cancel',()=>{output.textContent='本次未返回文件（可能取消或系统未完成读取），保留上次明细。';});
+    label.append(input);section.append(heading,description,label,output,list);document.querySelector('#cases').append(section);
+  }
+  document.querySelector('#clear').addEventListener('click',()=>results.forEach(reset=>reset()));
+</script>
+</body>
+</html>
