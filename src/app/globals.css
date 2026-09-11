@@ -138,6 +138,18 @@ html { scrollbar-gutter: stable; }
 .upload-attention{color:#8b4b2c}
 .upload-picker input.sr-only{width:1px;min-height:0;padding:0!important}
 
+/* Keep upload content within the composer on narrow screens. */
+@media(max-width:650px){
+ .editor .upload-box{min-width:0;max-width:100%;overflow-wrap:anywhere}
+ .editor .upload-summary>div{flex-wrap:wrap;gap:4px 12px}
+ .editor .upload-summary>div>span{flex-shrink:0;margin-left:auto}
+ .editor .upload-details{min-width:0;max-width:100%}
+ .editor .upload-details>summary>span:last-child{flex-shrink:0}
+ .editor .upload-info{flex:1 1 100%;max-width:100%}
+ .editor .upload-list li{align-items:flex-start;gap:6px 8px}
+ .editor .upload-list li>button,.editor .upload-list li>.button{max-width:100%;min-height:40px;margin:0;font-size:12px;padding:6px 10px}
+}
+
 .record-kind-dialog{width:min(540px,calc(100% - 32px))}
 .new-event-choice{padding:24px}
 .new-event-choice h1{font-size:25px;margin:0 0 8px}
