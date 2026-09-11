@@ -42,7 +42,7 @@ export function RecoveryForm(){
       <ol className="recovery-steps">
         <li>打开邮箱，查找密码恢复邮件，也请检查垃圾邮件。</li>
         <li>在当前浏览器中打开邮件链接，设置新密码。</li>
-        <li>返回 MomentNest，使用新密码登录。</li>
+        <li>返回 时光记，使用新密码登录。</li>
       </ol>
       <p className="muted">邮件可能需要几分钟送达。只使用最新邮件中的链接。</p>
     </>:<><h1>找回密码</h1><p className="muted">输入邀请时使用的邮箱，我们会发送设置新密码的链接。</p></>}

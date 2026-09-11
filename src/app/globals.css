@@ -35,7 +35,9 @@ body{background-image:radial-gradient(#bcc9b21a .7px,transparent .7px);backgroun
 .journal-feed .journal-empty{margin:16px auto 32px;padding:36px 24px}
 .journal-empty .empty-mark{font-size:30px}
 .journal-empty h2{margin-top:12px}
-.journal-feed .pager:empty{display:none}
+.timeline-loader{min-height:52px;margin:24px 0;text-align:center;color:var(--muted);font-size:13px}
+.timeline-loader>p{margin:0;padding:14px 0}
+.timeline-loader .notice{margin:0}
 @media(max-width:650px){
  .home-intro{align-items:flex-start;gap:14px;padding:20px 0}
  .home-title{display:block}
