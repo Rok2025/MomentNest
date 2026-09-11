@@ -131,6 +131,7 @@ export function Uploader({items,onChange,disabled,onExpired,date,today,memberId}
  {!disabled&&!items.length&&<UploadDrafts onRestore={restore} disabled={disabled}/>}
  {restoreNotice&&<p className="upload-attention" role="status">{restoreNotice}</p>}
  <section className="upload-box"><label className="upload-picker">＋ 添加照片 / 视频<input className="sr-only" type="file" multiple accept={accept} disabled={disabled||items.length>=MAX_FILES} onChange={e=>select(e.currentTarget)} onInput={e=>select(e.currentTarget)}/></label>
+ <p className="muted">选好照片后等待较久？<a href="/photo-picker-check.html" target="_blank" rel="noopener noreferrer">照片选择速度对比（新页面）</a></p>
  {message&&<p className="upload-attention" role="status">{message}</p>}
  {!!duplicates.length&&<div className="upload-duplicates" role="status"><p>已跳过 {duplicates.length} 份重复素材。</p><ul>{duplicates.map((d,i)=><li key={i}>{d.name} · {d.existing?<a href={`/events/${d.existing.eventId}`} target="_blank" rel="noreferrer">已收录于 {d.existing.occurredOn}，查看回忆</a>:'本批已添加或已恢复'}</li>)}</ul></div>}
  <details className="upload-help"><summary>格式和大小说明</summary><p>每批最多100份 · 照片50 MB / 视频1 GB。未保存草稿保留7天；手机刷新后可能需要重新选择未传完的原文件。Live Photo 请分别选择照片和视频。</p></details>
