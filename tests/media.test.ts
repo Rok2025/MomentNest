@@ -27,7 +27,7 @@ describe('media save and job contracts',()=>{
  it('批量授权拒绝超限、不合法文件及家庭外用户，失败不插入半批',async()=>{
   const before=(await db.query('select count(*)::int as n from momentnest.upload_sessions')).rows[0];
   await expect(authorizeUploads(tx,father,[])).rejects.toMatchObject({code:'VALIDATION'});
-  await expect(authorizeUploads(tx,father,Array.from({length:101},()=>({name:'x.jpg',size:10})))).rejects.toMatchObject({code:'VALIDATION'});
+  await expect(authorizeUploads(tx,father,Array.from({length:1001},()=>({name:'x.jpg',size:10})))).rejects.toMatchObject({code:'VALIDATION'});
   await expect(authorizeUploads(tx,father,[{name:'ok.jpg',size:10},{name:'bad.exe',size:10}])).rejects.toMatchObject({code:'VALIDATION'});
   await expect(authorizeUploads(tx,outsider,[{name:'x.jpg',size:10}])).rejects.toMatchObject({code:'FORBIDDEN'});
   expect((await db.query('select count(*)::int as n from momentnest.upload_sessions')).rows[0]).toEqual(before);

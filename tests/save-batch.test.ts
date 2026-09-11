@@ -22,9 +22,12 @@ async function files(count:number){
 }
 const input=(ids:string[])=>({requestKey:randomUUID(),title:'',body:'',feeling:'',occurredOn:'2025-08-01',uploadIds:ids});
 describe('batched save transaction',()=>{
- it('拒绝101份批量授权和保存',async()=>{
-  await expect(authorizeUploads(tx,auth,Array.from({length:101},()=>({name:'limit.jpg',size:123})))).rejects.toMatchObject({code:'VALIDATION'});
-  await expect(saveEvent(tx,auth,input(Array.from({length:101},()=>randomUUID())))).rejects.toThrow();
+ it('允许1000份批量授权和保存，拒绝第1001份',async()=>{
+  const allowed=await authorizeUploads(tx,auth,Array.from({length:1000},(_,i)=>({name:`limit-${i}.jpg`,size:123})));
+  expect(allowed).toHaveLength(1000);
+  await db.query("delete from momentnest.upload_sessions where filename like 'limit-%'");
+  await expect(authorizeUploads(tx,auth,Array.from({length:1001},()=>({name:'limit.jpg',size:123})))).rejects.toMatchObject({code:'VALIDATION'});
+  await expect(saveEvent(tx,auth,input(Array.from({length:1001},()=>randomUUID())))).rejects.toThrow();
  });
  it('单条回忆可分批追加到201份，计数、顺序和任务保持一致',async()=>{
   const old=await files(100),id=await saveEvent(tx,auth,input(old));

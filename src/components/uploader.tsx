@@ -7,7 +7,7 @@ import {uploadProgress,formatUploadBytes} from '@/domain/upload-progress';
 import {UploadQueue} from '@/domain/upload-queue';
 import {hashFile} from '@/domain/file-hash';
 import {monitorUploads} from '@/domain/upload-diagnostic';
-import {fileProblem,MAX_FILES} from '@/domain/media';
+import {fileKind,fileProblem,MAX_FILES} from '@/domain/media';
 import {BIRTHDAY,validEventDate} from '@/domain/dates';
 import {uploadDateReady} from '@/domain/upload-date';
 import type {DraftFile,DuplicateMedia} from '@/domain/upload-draft';
@@ -15,8 +15,8 @@ export type UploadItem={key:string;file:{name:string;size:number;type?:string;la
 type Ticket=UploadAuth&{name?:string;duplicate?:DuplicateMedia;reused?:boolean;archiveDate?:string|null};
 const accept='image/jpeg,image/png,image/webp,image/heic,image/heif,video/quicktime,video/mp4,.jpg,.jpeg,.png,.webp,.heic,.heif,.mov,.mp4,.m4v';
 export function Uploader({items,onChange,disabled,onExpired,date,today,memberId}:{items:UploadItem[];onChange:(items:UploadItem[])=>void;disabled:boolean;onExpired:()=>void;date:string;today:string;memberId:string}){
- const details=useRef<HTMLDetailsElement>(null),current=useRef(items),mounted=useRef(true),batchId=useRef(''),controllers=useRef(new Map<string,AbortController>()),serial=useRef(Promise.resolve());
- const [queue]=useState(()=>new UploadQueue(2)),[open,setOpen]=useState(false),[message,setMessage]=useState(''),[duplicates,setDuplicates]=useState<{name:string;existing?:DuplicateMedia}[]>([]),[restoreNotice,setRestoreNotice]=useState('');
+ const details=useRef<HTMLDetailsElement>(null),current=useRef(items),mounted=useRef(true),batchId=useRef(''),controllers=useRef(new Map<string,AbortController>());
+ const [queue]=useState(()=>new UploadQueue({limit:3,videoLimit:2})),[preparation]=useState(()=>new UploadQueue(2)),[open,setOpen]=useState(false),[message,setMessage]=useState(''),[duplicates,setDuplicates]=useState<{name:string;existing?:DuplicateMedia}[]>([]),[restoreNotice,setRestoreNotice]=useState('');
  const marker=`momentnest:upload-page:${memberId}`;
  useEffect(()=>{current.current=items;},[items]);
  useEffect(()=>monitorUploads(memberId,()=>current.current),[memberId]);
@@ -26,8 +26,8 @@ export function Uploader({items,onChange,disabled,onExpired,date,today,memberId}
   const remember=()=>{try{sessionStorage.setItem(marker,JSON.stringify({count:current.current.length,at:Date.now(),event:'pagehide'}));}catch{}};
   window.addEventListener('pagehide',remember);
   const active=controllers.current;
-  return()=>{mounted.current=false;queue.clear();active.forEach(c=>c.abort());window.removeEventListener('pagehide',remember);};
- },[queue,marker]);
+  return()=>{mounted.current=false;queue.clear();preparation.clear();active.forEach(c=>c.abort());window.removeEventListener('pagehide',remember);};
+ },[queue,preparation,marker]);
  function publish(next:UploadItem[]){const countChanged=next.length!==current.current.length;current.current=next;onChange(next);if(countChanged)try{sessionStorage.setItem(marker,JSON.stringify({count:next.length,event:'updated'}));}catch{}}
  function present(key:string){return mounted.current&&current.current.some(i=>i.key===key);}
  function patch(key:string,values:Partial<UploadItem>){if(present(key))publish(current.current.map(i=>i.key===key?{...i,...values}:i));}
@@ -67,7 +67,7 @@ export function Uploader({items,onChange,disabled,onExpired,date,today,memberId}
   }catch(e){patch(item.key,{status:'failed',error:!item.blob?`未完成验证：${(e as Error).message}。如需续传，请重新选择原文件。`:(e as Error).message});}
   finally{if(controllers.current.get(item.key)===controller)controllers.current.delete(item.key);}
  }
- function enqueue(item:UploadItem,auth?:Ticket){patch(item.key,{status:'waiting',error:undefined});queue.add(item.key,()=>upload(item,auth),item.file.size);}
+ function enqueue(item:UploadItem,auth?:Ticket){patch(item.key,{status:'waiting',error:undefined});queue.add(item.key,()=>upload(item,auth),item.file.size,fileKind(item.file.name)||'image');}
  async function prepare(item:UploadItem,replacement?:UploadItem){
   if(!present(item.key)||!item.blob)return;
   const controller=new AbortController();controllers.current.set(item.key,controller);
@@ -94,7 +94,7 @@ export function Uploader({items,onChange,disabled,onExpired,date,today,memberId}
   }catch(e){patch(item.key,{...(replacement?replacement:{}),status:'failed',error:(e as Error).message});}
   finally{if(controllers.current.get(item.key)===controller)controllers.current.delete(item.key);}
  }
- function schedule(item:UploadItem,replacement?:UploadItem){serial.current=serial.current.then(()=>prepare(item,replacement)).catch(()=>{});}
+ function schedule(item:UploadItem,replacement?:UploadItem){preparation.add(item.key,()=>prepare(item,replacement),item.file.size);}
  function select(input:HTMLInputElement,replacement?:UploadItem){
   const files=Array.from(input.files||[]);input.value='';
   if(!files.length)return;
@@ -104,10 +104,10 @@ export function Uploader({items,onChange,disabled,onExpired,date,today,memberId}
   publish(replacement?current.current.map(i=>i.key===replacement.key?added[0]:i):[...current.current,...added]);
   for(const item of added){const error=fileProblem(item.file.name,item.file.size);if(error)patch(item.key,{status:'failed',error});else schedule(item,replacement);}
  }
- function leaveDraft(){queue.clear();controllers.current.forEach(c=>c.abort());publish([]);setOpen(false);setMessage('已返回草稿列表。尚未登记的文件需要重新选择。');}
+ function leaveDraft(){queue.clear();preparation.clear();controllers.current.forEach(c=>c.abort());publish([]);setOpen(false);setMessage('已返回草稿列表。尚未登记的文件需要重新选择。');}
  function retry(item:UploadItem){if(item.id)enqueue(item);else if(item.blob)schedule(item);else setMessage('请重新选择原文件后继续');}
  async function remove(item:UploadItem){
-  queue.remove(item.key);controllers.current.get(item.key)?.abort();
+  queue.remove(item.key);preparation.remove(item.key);controllers.current.get(item.key)?.abort();
   try{if(item.id)await api('/api/uploads/cancel',{id:item.id});publish(current.current.filter(i=>i.key!==item.key));}catch(e){setMessage(`移除失败：${(e as Error).message}`);}
  }
  function restore(id:string,files:DraftFile[]){
@@ -131,7 +131,7 @@ export function Uploader({items,onChange,disabled,onExpired,date,today,memberId}
  <section className="upload-box"><label className="upload-picker">＋ 添加照片 / 视频<input className="sr-only" type="file" multiple accept={accept} disabled={disabled||items.length>=MAX_FILES} onChange={e=>select(e.currentTarget)} onInput={e=>select(e.currentTarget)}/></label>
  {message&&<p className="upload-attention" role="status">{message}</p>}
  {!!duplicates.length&&<div className="upload-duplicates" role="status"><p>已跳过 {duplicates.length} 份重复素材。</p><ul>{duplicates.map((d,i)=><li key={i}>{d.name} · {d.existing?<a href={`/events/${d.existing.eventId}`} target="_blank" rel="noreferrer">已收录于 {d.existing.occurredOn}，查看回忆</a>:'本批已添加或已恢复'}</li>)}</ul></div>}
- <details className="upload-help"><summary>格式和大小说明</summary><p>每批最多100份 · 照片50 MB / 视频1 GB。未保存草稿保留7天；手机刷新后可能需要重新选择未传完的原文件。Live Photo 请分别选择照片和视频。</p></details>
+ <details className="upload-help"><summary>格式和大小说明</summary><p>每批最多{MAX_FILES}份 · 照片50 MB / 视频1 GB。最多同时上传3份，其中视频最多2份。未保存草稿保留7天；手机刷新后可能需要重新选择未传完的原文件。Live Photo 请分别选择照片和视频。</p></details>
  {items.length>0&&<div className="upload-summary" aria-label="整体上传进度"><div><strong role="status">传输完成 {summary.completed}/{summary.count} · 待保存</strong><span>{summary.percent}%</span></div><progress aria-label="文件传输总进度" max={100} value={summary.percent}/><p>{summary.completed===summary.count?'文件已传输完成，请确认日期并点击保存。':`剩余上传 ${formatUploadBytes(summary.remaining)}`}{summary.failed?` · ${summary.failed} 份失败`:''}</p>{errorSummary.map(error=><p key={error} role="alert" className="upload-attention">{error}</p>)}<small>保存成功后才会收录到回忆。已传完的素材可以从草稿恢复。</small></div>}
  {items.length>0&&<button type="button" disabled={disabled} onClick={leaveDraft}>返回草稿列表</button>}
  {!!pendingDates.length&&<div className="upload-date-notice"><p role="status">{pendingDates.length} 份素材需要确认归档日期，确认后才能保存。</p><button type="button" disabled={disabled} onClick={confirmDates}>去确认日期</button></div>}

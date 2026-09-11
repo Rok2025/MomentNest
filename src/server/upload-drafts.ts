@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {DomainError} from '../domain/events';
-import {fileKind,fileProblem} from '../domain/media';
+import {fileKind,fileProblem,MAX_FILES} from '../domain/media';
 import {TEMP_UPLOAD_BYTES,type DraftFile,type DraftBatch,type DuplicateMedia} from '../domain/upload-draft';
 import {memberFor,type Transaction,type Queryable} from './event-store';
 
@@ -35,7 +35,7 @@ export async function draftBatches(db:Queryable,authId:string):Promise<DraftBatc
 }
 export async function draftFiles(db:Queryable,authId:string,batchId:string):Promise<DraftFile[]>{
  const m=await memberFor(db,authId);
- const {rows}=await db.query(`select *,archive_date::text as archive_date from momentnest.upload_sessions where member_id=$1 and household_id=$2 and coalesce(batch_id,id)=$3 and state in ('authorized','verified') and expires_at>clock_timestamp() order by (state='verified') desc,created_at,id limit 100`,[m.id,m.householdId,batchId]);
+ const {rows}=await db.query("select *,archive_date::text as archive_date from momentnest.upload_sessions where member_id=$1 and household_id=$2 and coalesce(batch_id,id)=$3 and state in ('authorized','verified') and expires_at>clock_timestamp() order by (state='verified') desc,created_at,id limit $4",[m.id,m.householdId,batchId,MAX_FILES]);
  return rows.map(r=>({id:String(r.id),name:String(r.filename),size:Number(r.expected_size),kind:String(r.kind),state:String(r.state),sha256:r.sha256?String(r.sha256):null,clientSha256:r.client_sha256?String(r.client_sha256):null,lastModified:r.last_modified===null?null:Number(r.last_modified),archiveDate:r.archive_date?String(r.archive_date).slice(0,10):null,expiresAt:new Date(String(r.expires_at)).toISOString()}));
 }
 export async function discardDraft(tx:Transaction,authId:string,batchId:string){return tx(async db=>{

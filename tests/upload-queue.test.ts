@@ -18,6 +18,14 @@ describe('bounded upload scheduling',()=>{
   done.get('a')!();await flush();expect(started).toEqual(['a','b','c','d']);
   done.get('c')!();done.get('d')!();await flush();
  });
+ it('allows three concurrent transfers but never starts a third video',async()=>{
+  const queue=new UploadQueue({limit:3,videoLimit:2}),started:string[]=[],done=new Map<string,()=>void>();
+  const add=(key:string,kind:'image'|'video')=>queue.add(key,()=>new Promise<void>(resolve=>{started.push(key);done.set(key,resolve);}),0,kind);
+  add('video-a','video');add('video-b','video');add('video-c','video');add('photo-a','image');await flush();
+  expect(started).toEqual(['video-a','video-b','photo-a']);
+  done.get('video-a')!();await flush();expect(started).toEqual(['video-a','video-b','photo-a','video-c']);
+  done.get('video-b')!();done.get('photo-a')!();done.get('video-c')!();await flush();
+ });
  it('does not block following photos when one fails; retries never double-run',async()=>{
   const queue=new UploadQueue(1),run=vi.fn().mockRejectedValueOnce(Error('offline')).mockResolvedValue(undefined);
   queue.add('a',run);queue.add('a',run);const next=vi.fn(async()=>{});queue.add('b',next);

@@ -1,4 +1,6 @@
-export const MAX_FILES=100;
+// A selection may contain a full photo album. Transfer concurrency is controlled
+// separately so this is a user-facing batch limit, not a network limit.
+export const MAX_FILES=1000;
 export const MAX_IMAGE_BYTES=50*1024*1024;
 export const MAX_VIDEO_BYTES=1024*1024*1024;
 export type MediaKind='image'|'video';

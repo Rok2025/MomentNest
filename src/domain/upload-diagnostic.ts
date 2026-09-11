@@ -1,6 +1,7 @@
 import {z} from 'zod';
+import {MAX_FILES} from './media';
 
-const count=z.number().int().min(0).max(100);
+const count=z.number().int().min(0).max(MAX_FILES);
 export const uploadSnapshotSchema=z.object({
  pageId:z.string().uuid(),documentId:z.string().uuid(),at:z.number().int().nonnegative(),
  event:z.enum(['mount','heartbeat','hidden','visible','pagehide','pageshow','unmount','offline','online','error','unhandledrejection']),

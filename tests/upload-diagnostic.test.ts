@@ -39,7 +39,8 @@ describe('upload page diagnostics',()=>{
  it('rejects injected filenames, freeform errors and oversized counts',()=>{
   const e=environment(),stop=monitorUploads('member',()=>[]);const data=e.payload();
   expect(uploadDiagnosticSchema.safeParse({...data,filename:'secret.jpg'}).success).toBe(false);
-  expect(uploadDiagnosticSchema.safeParse({current:{...data.current,count:101}}).success).toBe(false);
+  expect(uploadDiagnosticSchema.safeParse({current:{...data.current,count:1000}}).success).toBe(true);
+  expect(uploadDiagnosticSchema.safeParse({current:{...data.current,count:1001}}).success).toBe(false);
   expect(uploadDiagnosticSchema.safeParse({current:{...data.current,error:'token=secret'}}).success).toBe(false);stop();
  });
 });
