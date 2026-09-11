@@ -9,7 +9,7 @@ export const readableDirectory = '照片和视频';
 type ExportEntry = {
   mediaId: string; eventId: string; householdId: string; uploader: string;
   originalFilename: string; path: string; occurredOn: string;
-  capturedText: string | null; needsTimeReview: boolean;
+  capturedText: string | null; captureTimeOverride: string | null; needsTimeReview: boolean;
   kind: string; mime: string; size: number; sha256: string;
 };
 
@@ -72,12 +72,13 @@ async function exportReadableMedia(snapshot: Snapshot, folder: string) {
       uploader: member && member.household_id === media.household_id ? String(member.label) : '未知成员',
       originalFilename: String(media.filename), path: relative, occurredOn: date,
       capturedText: media.captured_text ? String(media.captured_text) : null,
+      captureTimeOverride: media.capture_time_override ? String(media.capture_time_override) : null,
       needsTimeReview: media.needs_time_review === true || !isCalendarDate(date),
       kind: String(media.kind), mime: String(media.mime), size: file.size, sha256: file.sha256 });
   }
   if (seen.size !== snapshot.files.length) throw Error('EXPORT_COUNT_MISMATCH');
-  const header = ['归档日期', '上传者', '原始文件名', '导出路径', '类型', '待修改时间', '拍摄时间原值', '素材ID', '回忆ID', '家庭ID', '字节数', 'SHA256'];
-  const rows = entries.map(e => [e.occurredOn, e.uploader, e.originalFilename, e.path, e.kind, e.needsTimeReview ? '是' : '否', e.capturedText, e.mediaId, e.eventId, e.householdId, e.size, e.sha256]);
+  const header = ['归档日期', '上传者', '原始文件名', '导出路径', '类型', '待修改时间', '拍摄时间原值', '修改后的拍摄时间（北京时间）', '素材ID', '回忆ID', '家庭ID', '字节数', 'SHA256'];
+  const rows = entries.map(e => [e.occurredOn, e.uploader, e.originalFilename, e.path, e.kind, e.needsTimeReview ? '是' : '否', e.capturedText, e.captureTimeOverride, e.mediaId, e.eventId, e.householdId, e.size, e.sha256]);
   await writeFile(join(destination, '导出清单.csv'), '\uFEFF' + [header, ...rows].map(row => row.map(csvCell).join(',')).join('\r\n') + '\r\n', { flag: 'wx', mode: 0o600 });
   await writeFile(join(destination, 'manifest.json'), JSON.stringify({ version: 1, dateBasis: 'event.occurred_on', entries }, null, 2), { flag: 'wx', mode: 0o600 });
   await writeFile(join(destination, '说明.txt'), '照片和视频为原始内容的独立副本，没有压缩或转码。\n文件夹使用回忆的归档日期，不代表已确认的拍摄日期。待修改时间的素材见导出清单。\n保留原始文件名；不兼容的文件名字符会替换，同名文件追加编号以防覆盖。准确原名保留在清单中。\n包含此项目所有成员已保存的素材，不含未保存的临时上传。文字回忆和其他业务信息保存在上一级 snapshot.json。\nHEIC、MOV 等格式需要支持该格式的查看软件。\n系统恢复请保留上一级 snapshot.json、snapshot.sha256 和 originals 目录。登录密码、会话及服务器配置不在此备份内。\n', { flag: 'wx', mode: 0o600 });

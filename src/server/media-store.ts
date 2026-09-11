@@ -5,6 +5,7 @@ import { memberFor,type Queryable,type Transaction } from './event-store';
 import { previewLinks,playbackLink } from './media-preview';
 import { coverJoin,mediaList } from './media-query';
 import {TEMP_UPLOAD_BYTES} from '../domain/upload-draft';
+import {captureTimeInput,effectiveCaptureTime} from '../domain/media-capture-time';
 export async function authorizeUploads(tx:Transaction,authId:string,files:{name:string;size:number}[]){
  if(!files.length||files.length>MAX_FILES)throw new DomainError('VALIDATION',`每批请选择1至${MAX_FILES}份素材`);
  for(const file of files){const problem=fileProblem(file.name,file.size);if(problem||file.name.length>255)throw new DomainError('VALIDATION',problem||'文件名过长');}
@@ -61,7 +62,18 @@ export async function bindUploads(db:Queryable,m:Member,eventId:string,uploads:R
   await db.query('insert into momentnest.media_jobs(media_id) values($1)',[id]);await db.query("update momentnest.upload_sessions set state='bound',event_id=$1 where id=$2",[eventId,u.id]);
  }
 }
-export function mediaRecord(r:Record<string,unknown>,withPreviewLinks=false):MediaRecord{return {id:String(r.id),eventId:String(r.event_id),filename:String(r.filename),kind:r.kind as MediaRecord['kind'],mime:String(r.mime),size:Number(r.size),position:Number(r.position),status:r.status as MediaRecord['status'],needsTimeReview:r.needs_time_review===true,capturedText:r.captured_text?String(r.captured_text):null,capturedZone:r.captured_zone?String(r.captured_zone):null,errorCode:r.error_code?String(r.error_code):null,hasPreview:!!r.preview_key,hasPlayback:!!r.playback_key,...(withPreviewLinks?{preview:previewLinks(r),playback:playbackLink(r)}:{})};}
+export function mediaRecord(r:Record<string,unknown>,withPreviewLinks=false):MediaRecord{return {id:String(r.id),eventId:String(r.event_id),filename:String(r.filename),kind:r.kind as MediaRecord['kind'],mime:String(r.mime),size:Number(r.size),position:Number(r.position),status:r.status as MediaRecord['status'],needsTimeReview:r.needs_time_review===true,...effectiveCaptureTime(r),errorCode:r.error_code?String(r.error_code):null,hasPreview:!!r.preview_key,hasPlayback:!!r.playback_key,...(withPreviewLinks?{preview:previewLinks(r),playback:playbackLink(r)}:{})};}
+export async function updateMediaCaptureTime(tx:Transaction,authId:string,id:string,raw:unknown){
+ const input=captureTimeInput.parse(raw);
+ return tx(async db=>{
+  const media=await ownMedia(db,authId,id);
+  const {rows}=await db.query(`update momentnest.media set capture_time_override=$1
+   where household_id=$2 and id=$3 and capture_time_override is not distinct from $4::text returning *`,
+   [input.capturedTime,media.household_id,id,input.expectedOverride]);
+  if(!rows.length)throw new DomainError('CONFLICT','这份文件的时间已被修改，请关闭编辑后重新打开查看最新时间');
+  return mediaRecord(rows[0]);
+ });
+}
 export async function listMedia(db:Queryable,authId:string,eventId:string,withPreviewLinks=false){const m=await memberFor(db,authId);return (await db.query('select * from momentnest.media where household_id=$1 and event_id=$2 order by position',[m.householdId,eventId])).rows.map(r=>mediaRecord(r,withPreviewLinks));}
 // Used by the feed query and by one batched refresh for unfinished covers.
 export async function listEventCovers(db:Queryable,authId:string,eventIds:string[],withPreviewLinks=false){

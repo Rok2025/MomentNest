@@ -36,7 +36,7 @@ jobs:
           pnpm prune --prod
           printf '%s\n' "$GITHUB_SHA" > COMMIT
           mkdir -p public
-          tar --exclude='.next/cache' -czf /tmp/momentnest.tgz .next node_modules package.json next.config.mjs tsconfig.json config src public workers scripts deploy COMMIT
+          tar --exclude='.next/cache' -czf /tmp/momentnest.tgz .next node_modules package.json next.config.mjs tsconfig.json config src public workers scripts deploy supabase/migrations COMMIT
       - name: Configure deployment SSH
         env:
           DEPLOY_KEY: ${{ secrets.HUAWEI_DEPLOY_KEY }}

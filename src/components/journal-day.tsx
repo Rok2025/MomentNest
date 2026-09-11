@@ -3,16 +3,17 @@ import Link from 'next/link';
 import {useState} from 'react';
 import {MediaView} from './media-gallery';
 import {MediaViewer} from './media-viewer';
+import {sortByCaptureTime} from '@/domain/capture-date';
 import {ageOn} from '@/domain/dates';
 import type {EventRecord} from '@/domain/events';
 import type {MediaRecord} from '@/domain/media';
 import {journalDayContent,type JournalDay as Day} from '@/domain/journal-days';
 import styles from './journal-day.module.css';
 
-export function JournalDay({day,index,total,remember}:{day:Day;index:number;total:number;remember:(event:EventRecord)=>void}){
+export function JournalDay({day,index,total,remember,onMediaChange}:{day:Day;index:number;total:number;remember:(event:EventRecord)=>void;onMediaChange:(media:MediaRecord)=>void}){
  const remaining=Math.max(0,total-day.events.length),content=journalDayContent(day);
  const [selected,setSelected]=useState<string|null>(null);
- const allMedia=[...content.images,...content.videos];
+ const allMedia=sortByCaptureTime([...content.images,...content.videos]);
  function gallery(items:MediaRecord[],kind:'照片'|'视频'){
   if(!items.length)return null;
   return <section className={styles.section} aria-label={`${day.date}的${kind}`}>
@@ -45,6 +46,6 @@ export function JournalDay({day,index,total,remember}:{day:Day;index:number;tota
     {remaining>0&&<p className={styles.remaining}>这一天还有 {remaining} 次记录，继续向下加载可一起查看。</p>}
    </div>
   </article>
-  {selected&&<MediaViewer items={allMedia} selectedId={selected} date={day.date} onSelect={setSelected} onClose={()=>setSelected(null)} onRemember={media=>{const event=day.events.find(e=>e.id===media.eventId);if(event)remember(event);}}/>}
+  {selected&&<MediaViewer items={allMedia} selectedId={selected} date={day.date} onSelect={setSelected} onClose={()=>setSelected(null)} onMediaChange={onMediaChange}/>}
  </>;
 }

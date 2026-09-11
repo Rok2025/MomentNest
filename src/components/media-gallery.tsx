@@ -4,19 +4,19 @@ import bufferStyles from './video-buffer.module.css';
 import { mediaPending,mediaStatusText,reusePreview,type MediaRecord,type PreviewLinks } from '@/domain/media';
 import { pollWhileVisible } from '@/domain/visible-poll';
 import { formatCaptureTime,sortByCaptureTime } from '@/domain/capture-date';
-async function getLink(id:string,variant:string):Promise<{url:string;preview?:PreviewLinks}>{
+export async function getMediaLink(id:string,variant:string):Promise<{url:string;preview?:PreviewLinks}>{
  const r=await fetch(`/api/media/${id}/url`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({variant}),cache:'no-store'});
  if(!r.ok)throw Error('素材暂不可用，请重新登录或稍后重试');
  return r.json();
 }
-export function MediaView({media,compact=false,priority=false,thumbnail=false,onRetry}:{media:MediaRecord;compact?:boolean;priority?:boolean;thumbnail?:boolean;onRetry?:()=>void}){
+export function MediaView({media,compact=false,priority=false,thumbnail=false,immersive=false,onRetry,onPlaybackChange}:{media:MediaRecord;compact?:boolean;priority?:boolean;thumbnail?:boolean;immersive?:boolean;onRetry?:()=>void;onPlaybackChange?:(playing:boolean)=>void}){
  const [renewed,setRenewed]=useState<{source:string|undefined;links:PreviewLinks}|null>(null);
  const preview=renewed&&renewed.source===media.preview?.url?renewed.links:media.preview;
  const [playback,setPlayback]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  const [needsPlay,setNeedsPlay]=useState(false),[buffering,setBuffering]=useState(false);
  const video=useRef<HTMLVideoElement>(null),resume=useRef(0),attempted=useRef('');
  async function refreshPreview(){
-  try{const data=await getLink(media.id,'preview');if(data.preview)setRenewed({source:media.preview?.url,links:data.preview});setError('');}
+  try{const data=await getMediaLink(media.id,'preview');if(data.preview)setRenewed({source:media.preview?.url,links:data.preview});setError('');}
   catch{setError('预览暂不可用，请稍后重试');}
  }
  function imageError(){
@@ -28,7 +28,7 @@ export function MediaView({media,compact=false,priority=false,thumbnail=false,on
   try{await player.play();setNeedsPlay(false);}
   catch(e){setBuffering(false);if((e as Error).name==='NotAllowedError')setNeedsPlay(true);else if((e as Error).name!=='AbortError')setError('视频暂时无法播放，请刷新播放链接后重试。');}
  }
- async function play(forceRefresh=false){if(busy)return;setBusy(true);setError('');setNeedsPlay(false);setBuffering(true);try{resume.current=video.current?.currentTime||0;const cached=media.playback;setPlayback(!forceRefresh&&cached&&cached.expiresAt>Date.now()+30000?cached.url:(await getLink(media.id,'playback')).url);}catch(e){setBuffering(false);setError((e as Error).message);}finally{setBusy(false);}}
+ async function play(forceRefresh=false){if(busy)return;setBusy(true);setError('');setNeedsPlay(false);setBuffering(true);try{resume.current=video.current?.currentTime||0;const cached=media.playback;setPlayback(!forceRefresh&&cached&&cached.expiresAt>Date.now()+30000?cached.url:(await getMediaLink(media.id,'playback')).url);}catch(e){setBuffering(false);setError((e as Error).message);}finally{setBusy(false);}}
  async function retry(){
   setBusy(true);setError('');
   try{const r=await fetch(`/api/media/${media.id}/retry`,{method:'POST'});if(!r.ok)throw Error();onRetry?.();}
@@ -36,13 +36,13 @@ export function MediaView({media,compact=false,priority=false,thumbnail=false,on
  }
  const status=mediaStatusText(media);
  const visual=media.kind==='video'&&playback&&!compact?
-   <video key={playback} ref={video} src={playback} poster={preview?.url} controls playsInline preload="auto" onLoadedMetadata={()=>{if(video.current&&resume.current)video.current.currentTime=resume.current;void startPlayback();}} onPlay={()=>setNeedsPlay(false)} onPlaying={()=>setBuffering(false)} onWaiting={()=>setBuffering(true)} onPause={()=>setBuffering(false)} onEnded={()=>setBuffering(false)} onError={()=>{setBuffering(false);setError('播放链接可能已过期，请刷新播放链接后继续。');}}/>:
+   <video key={playback} ref={video} src={playback} poster={preview?.url} controls playsInline preload="auto" onLoadedMetadata={()=>{if(video.current&&resume.current)video.current.currentTime=resume.current;void startPlayback();}} onPlay={()=>{setNeedsPlay(false);onPlaybackChange?.(true);}} onPlaying={()=>setBuffering(false)} onWaiting={()=>setBuffering(true)} onPause={()=>{setBuffering(false);onPlaybackChange?.(false);}} onEnded={()=>{setBuffering(false);onPlaybackChange?.(false);}} onError={()=>{setBuffering(false);onPlaybackChange?.(false);setError('播放链接可能已过期，请刷新播放链接后继续。');}}/>:
    preview?
     // Private, pre-generated variants use browser srcSet; do not pass signed URLs through a public image optimizer.
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={preview.url} srcSet={preview.srcSet} sizes={thumbnail?'(max-width: 650px) 28vw, 150px':compact?'(max-width: 650px) calc(100vw - 104px), (max-width: 1120px) 40vw, 450px':'(max-width: 650px) calc(100vw - 74px), 760px'} width={preview.width} height={preview.height} alt={compact?'回忆封面':media.filename} loading={priority?'eager':'lazy'} fetchPriority={priority?'high':'auto'} decoding="async" onError={imageError}/>:
+    <img src={preview.url} srcSet={preview.srcSet} sizes={immersive?'100vw':thumbnail?'(max-width: 650px) 28vw, 150px':compact?'(max-width: 650px) calc(100vw - 104px), (max-width: 1120px) 40vw, 450px':'(max-width: 650px) calc(100vw - 74px), 760px'} width={preview.width} height={preview.height} alt={compact?'回忆封面':media.filename} loading={priority?'eager':'lazy'} fetchPriority={priority?'high':'auto'} decoding="async" draggable={!immersive} onError={imageError}/>:
     <div className="media-placeholder"><span aria-hidden="true">{media.kind==='video'?'▷':'▧'}</span><p role="status">{status}</p></div>;
- return <figure className={`media-item ${compact?'compact':''} ${media.needsTimeReview?'time-review':''}`}>
+ return <figure className={`media-item ${compact?'compact':''} ${media.needsTimeReview&&!immersive?'time-review':''}`}>
   {media.kind==='video'&&!compact?<div className="video-surface">
    {visual}
    {playback&&buffering&&!needsPlay&&<div className={bufferStyles.buffer} role="status"><span>视频缓冲中，请稍候…</span></div>}
@@ -51,15 +51,20 @@ export function MediaView({media,compact=false,priority=false,thumbnail=false,on
     {busy&&<span className="video-play-status" role="status">正在加载视频…</span>}
    </button>}
   </div>:visual}
-  {media.needsTimeReview&&<span className="media-time-review-badge">待修改时间</span>}
+  {media.needsTimeReview&&!immersive&&<span className="media-time-review-badge">待修改时间</span>}
   {compact&&media.kind==='video'&&<span className="video-badge">▷ {media.status==='ready'?'视频':status}</span>}
   {compact&&error&&<span className="media-load-error">预览暂不可用，点开重试</span>}
-  {!compact&&<figcaption><strong>{media.filename}</strong>
+  {immersive&&(error||media.status==='failed'||(preview&&media.status!=='ready'))&&<div className="media-feedback" role="status">
+   <span>{error||status}</span>
+   {error&&<button type="button" disabled={busy} onClick={()=>void (playback?play(true):refreshPreview())}>重试</button>}
+   {media.status==='failed'&&<button type="button" disabled={busy} onClick={()=>void retry()}>重新处理</button>}
+  </div>}
+  {!compact&&!immersive&&<figcaption><strong>{media.filename}</strong>
    {media.needsTimeReview&&<p className="media-time-review-note">待修改时间：当前归档日期需要核对。</p>}
    {preview&&media.status!=='ready'&&<p className="media-processing" role="status">{status}</p>}
    <p className="muted">拍摄时间：{formatCaptureTime(media.capturedText,media.capturedZone)}</p><div className="media-actions">
     {playback&&error&&<button type="button" disabled={busy} onClick={()=>void play(true)}>刷新播放链接 ▷</button>}
-    <button type="button" onClick={()=>void getLink(media.id,'original').then(data=>window.location.assign(data.url)).catch(()=>setError('原件暂不可用，请稍后重试'))}>下载原件</button>
+    <button type="button" onClick={()=>void getMediaLink(media.id,'original').then(data=>window.location.assign(data.url)).catch(()=>setError('原件暂不可用，请稍后重试'))}>下载原件</button>
     {media.status==='failed'&&<button type="button" disabled={busy} onClick={()=>void retry()}>重新处理</button>}
    </div>{error&&<p role="status">{error} <button type="button" onClick={()=>void refreshPreview()}>刷新预览</button></p>}
   </figcaption>}

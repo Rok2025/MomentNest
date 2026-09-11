@@ -41,6 +41,10 @@ try {
       await pool.query('select needs_time_review from momentnest.media limit 0');
       const { rows } = await pool.query("select has_table_privilege(current_user,'momentnest.events','delete') as can_delete");
       if (rows[0].can_delete) throw Error();
+      stage = worker ? 'capture time worker isolation' : 'capture time edit migration';
+      await pool.query('select capture_time_override from momentnest.media limit 0');
+      const correctionGrant = await pool.query("select has_column_privilege(current_user,'momentnest.media','capture_time_override','UPDATE') as ok");
+      if (worker ? correctionGrant.rows[0].ok : !correctionGrant.rows[0].ok) throw Error();
       if (!worker) {
         stage = 'upload draft migration';
         await pool.query('select batch_id,request_key,client_sha256,last_modified,archive_date from momentnest.upload_sessions limit 0');
