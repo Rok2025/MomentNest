@@ -23,6 +23,10 @@
 
 ## 备份
 
+导入时间优先读取 MomentStamp 的 `urn:momentstamp:yoyo:1.0:` 命名空间内的 `yoyotime`，同时保存 `yoyotimeSource`、`yoyotimeRawValue` 到媒体 metadata。带偏移量的日期转换为北京时间，无时区保留原日期；字段存在但无效时需要手工确认。字段缺失才回退原有 EXIF/视频创建时间。上传校验、预览、转码共用解析逻辑，不会修改原文件。此变更不回填历史记录。
+
+运行环境需要 Perl（可用 `PERL_PATH` 指定）；ExifTool 随锁定的 `exiftool-vendored.pl` 依赖交付，不依赖 MomentStamp 的安装目录。发布预检会检查工具和 `config/yoyotime.config`。
+
 `pnpm backup`以只读一致性事务导出本项目所有家庭、所有成员的业务表及已关联原件，再从同一快照生成“照片和视频”目录：按归档日期分文件夹，恢复原始文件名，同名文件追加编号，附带CSV/JSON清单和待修改时间标记。两份独立副本均检查SHA-256及大小后才生成VERIFIED标记。原有系统恢复目录结构保持兼容，未关联临时媒体文件、Supabase Auth密码及会话不在备份内。
 
 本地使用 `.env.local`；在服务器项目目录运行 `MOMENTNEST_ENV_FILE=/etc/momentnest/runtime.env pnpm backup` 可显式加载运行配置。预留约两份原件的空间，并将完成的整个备份目录复制到异机。命令当前只供管理员使用；将来开放用户入口须单独实现家庭范围鉴权，不可直接开放全项目导出。

@@ -2,7 +2,7 @@
 const config = {
   poweredByHeader: false,
   devIndicators: false,
-  serverExternalPackages: ['exifr'],
+  serverExternalPackages: ['exifr', 'exiftool-vendored.pl'],
   outputFileTracingExcludes: {'/*':['./.private/**/*','./.env*','./work/**/*']},
   async headers() {
     return [{ source: '/:path*', headers: [

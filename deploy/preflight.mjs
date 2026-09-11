@@ -3,6 +3,7 @@ import { join, isAbsolute } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
+import exiftool from 'exiftool-vendored.pl';
 let stage = 'configuration';
 try {
   const e = process.env;
@@ -25,6 +26,8 @@ try {
     await access(tool);
   }
   execFileSync(e.FFMPEG_PATH, ['-version'], { stdio: 'ignore', timeout: 10000 });
+  await access('config/yoyotime.config');
+  execFileSync(e.PERL_PATH || 'perl', [exiftool, '-config', 'config/yoyotime.config', '-ver'], { stdio: 'ignore', timeout: 10000 });
   const ca = await readFile(e.DATABASE_CA_FILE, 'utf8');
   for (const [name, worker] of [['DATABASE_URL', false], ['WORKER_DATABASE_URL', true]]) {
     stage = worker ? 'worker database' : 'application database';

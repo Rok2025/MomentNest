@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-import exifr from 'exifr';
+import { readCapture } from '../src/server/storage/capture';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdir,rm } from 'node:fs/promises';
@@ -35,9 +35,9 @@ export async function processMedia(j:Job,stage:ProcessingStage='full'):Promise<P
  const base=derivativeBase(j),previewKey=base+'.jpg',preview=objectPath(previewKey);
  await mkdir(dirname(preview),{recursive:true,mode:0o700});
  try{
-  let capturedText:string|null=null,capturedZone:string|null=null;
+  const {capturedText,capturedZone,captureSource,yoyotime}=await readCapture(original,j.kind);
+  const captureMetadata={captureSource,yoyotime};
   if(j.kind==='image'){
-   try{const tags=await exifr.parse(original,{pick:['DateTimeOriginal','OffsetTimeOriginal'],reviveValues:false});if(tags?.DateTimeOriginal){capturedText=String(tags.DateTimeOriginal);capturedZone=tags.OffsetTimeOriginal?String(tags.OffsetTimeOriginal):null;}}catch{}
    const render=(source:string)=>sharp(source,{limitInputPixels:100000000}).rotate().resize({width:1920,height:1920,fit:'inside',withoutEnlargement:true}).withIccProfile('srgb').jpeg({quality:88}).toFile(preview);
    try{await render(original);}
    catch(e){
@@ -48,17 +48,15 @@ export async function processMedia(j:Job,stage:ProcessingStage='full'):Promise<P
     try{await render(fallback);}finally{await rm(fallback,{force:true});}
    }
    const variants=await thumbnails(previewKey,base);
-   return {previewKey,playbackKey:null,capturedText,capturedZone,metadata:{...variants,width:variants.previewWidth,height:variants.previewHeight,previewColor:'sRGB'}};
+   return {previewKey,playbackKey:null,capturedText,capturedZone,metadata:{...variants,...captureMetadata,width:variants.previewWidth,height:variants.previewHeight,previewColor:'sRGB'}};
   }
   const probe=JSON.parse((await run(process.env.FFPROBE_PATH||'ffprobe',['-v','error','-protocol_whitelist','file,pipe','-show_format','-show_streams','-of','json',original],{timeout:30000,maxBuffer:4*1024*1024})).stdout);
   const video=probe.streams?.find((s:{codec_type:string})=>s.codec_type==='video');
   if(!video)throw Error('VIDEO_TRACK_MISSING');
-  const tags=probe.format?.tags||{},raw=tags['com.apple.quicktime.creationdate']||tags.creation_time||video.tags?.creation_time;
-  if(typeof raw==='string'&&!raw.startsWith('1904-')&&!raw.startsWith('0000-')){capturedText=raw;capturedZone=/Z$/.test(raw)?'UTC':raw.match(/[+-]\d\d:?\d\d$/)?.[0]||null;}
   const hdr=['smpte2084','arib-std-b67'].includes(video.color_transfer);
   const scale="scale='min(1920,iw)':'min(1920,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2";
   const filter=(hdr?'zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,':'')+scale+',format=yuv420p';
-  const metadata:Record<string,unknown>={...j.metadata,width:video.width,height:video.height,sourceCodec:video.codec_name,duration:Number(probe.format?.duration)||null,hdrSource:hdr,playbackColor:'SDR',rotation:video.side_data_list?.find((d:{rotation?:number})=>d.rotation!==undefined)?.rotation||0};
+  const metadata:Record<string,unknown>={...j.metadata,...captureMetadata,width:video.width,height:video.height,sourceCodec:video.codec_name,duration:Number(probe.format?.duration)||null,hdrSource:hdr,playbackColor:'SDR',rotation:video.side_data_list?.find((d:{rotation?:number})=>d.rotation!==undefined)?.rotation||0};
   let poster=j.previewKey;
   if(stage!=='playback'){
    // Decode just the first frame, including orientation and HDR tone mapping.

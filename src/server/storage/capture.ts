@@ -2,9 +2,18 @@ import exifr from 'exifr';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { captureDate } from '../../domain/capture-date';
+import { readYoyoTime } from './yoyotime';
 
 const run = promisify(execFile);
 export async function readCapture(path: string, kind: string) {
+  // Failure to read the preferred metadata must not silently select another date.
+  const yoyotime = await readYoyoTime(path);
+  if (yoyotime) {
+    const capturedText = yoyotime.valid ? yoyotime.value : null;
+    const capturedZone = capturedText?.match(/(Z|[+-]\d{2}:?\d{2})$/)?.[1] || null;
+    return { capturedText, capturedZone: capturedZone === 'Z' ? 'UTC' : capturedZone,
+      capturedOn: captureDate(capturedText), captureSource: 'yoyotime', yoyotime };
+  }
   let capturedText: string | null = null, capturedZone: string | null = null;
   try {
     if (kind === 'image') {
@@ -24,5 +33,7 @@ export async function readCapture(path: string, kind: string) {
       }
     }
   } catch { /* Exported files may have no usable metadata; ask for the day in the editor. */ }
-  return { capturedText, capturedZone, capturedOn: captureDate(capturedText, capturedZone) };
+  const capturedOn = captureDate(capturedText, capturedZone);
+  return { capturedText: capturedOn ? capturedText : null, capturedZone: capturedOn ? capturedZone : null,
+    capturedOn, captureSource: capturedOn ? 'metadata' : null, yoyotime: null };
 }
