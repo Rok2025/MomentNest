@@ -17,7 +17,7 @@ async function cleanup(){
    for(const u of await claimExpired(tx)){
     // The claiming transaction excludes bound rows; recheck references before deleting bytes.
     const r=await pool.query("select id from momentnest.upload_sessions u where id=$1 and state='cleanup_claimed' and not exists(select 1 from momentnest.media m where m.upload_session_id=u.id)",[u.id]);
-    if(!r.rows.length)continue;await rm(objectPath(String(u.object_key)),{force:true});await rm(objectPath(String(u.object_key))+'.json',{force:true});const path=objectPath(String(u.object_key));await rm(path+'.parts',{recursive:true,force:true});for(const name of await readdir(dirname(path)).catch(()=>[]))if(name.startsWith(basename(path)+'.')&&name.endsWith('.part'))await rm(join(dirname(path),name),{force:true});await pool.query("update momentnest.upload_sessions set state='expired' where id=$1 and state='cleanup_claimed'",[u.id]);
+    if(!r.rows.length)continue;await rm(objectPath(String(u.object_key)),{force:true});await rm(objectPath(String(u.object_key))+'.json',{force:true});const path=objectPath(String(u.object_key));const confirmed=path.replace(/\.bin$/,'-c.bin');await rm(confirmed,{force:true});await rm(path+'.parts',{recursive:true,force:true});for(const name of await readdir(dirname(path)).catch(()=>[]))if((name.startsWith(basename(path)+'.')||name.startsWith(basename(confirmed)+'.'))&&name.endsWith('.part'))await rm(join(dirname(path),name),{force:true});await pool.query("update momentnest.upload_sessions set state='expired' where id=$1 and state='cleanup_claimed'",[u.id]);
    }lastCleanup=Date.now();
   }
 }

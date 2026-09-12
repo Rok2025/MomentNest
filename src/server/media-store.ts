@@ -52,7 +52,7 @@ export async function lockUploads(db:Queryable,m:Member,ids:string[]){
  if(rows.length!==ids.length||rows.some(u=>u.household_id!==m.householdId||u.member_id!==m.id||u.state!=='verified'||new Date(String(u.expires_at)).valueOf()<=Date.now()))throw new DomainError('VALIDATION','部分素材未验证、已失效或不属于当前账号，请重新上传');
  const hashes=rows.map(u=>`${u.sha256}:${u.expected_size}`);
  if(new Set(hashes).size!==hashes.length)throw new DomainError('VALIDATION','本批包含内容完全相同的素材，请移除重复项后保存');
- const saved=await db.query('select m.id from momentnest.media m join momentnest.upload_sessions u on m.sha256=u.sha256 and m.size=u.expected_size where m.household_id=$1 and u.id=any($2::uuid[]) limit 1',[m.householdId,ids]);
+ const saved=await db.query('select m.id from momentnest.media m join momentnest.upload_sessions source on source.id=m.upload_session_id join momentnest.upload_sessions u on (m.sha256=u.sha256 and m.size=u.expected_size) or (source.sha256=u.sha256 and source.expected_size=u.expected_size) where m.household_id=$1 and u.id=any($2::uuid[]) limit 1',[m.householdId,ids]);
  if(saved.rows.length)throw new DomainError('CONFLICT','部分素材已收录，请重新校验素材，跳过重复项后保存');
  return ids.map(id=>rows.find(u=>u.id===id)!);
 }

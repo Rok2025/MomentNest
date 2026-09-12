@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { validEventDate, todayShanghai } from './dates';
 import { MAX_FILES, type MediaRecord } from './media';
+import { confirmedUploadTime } from './upload-time';
 export const uuid = z.string().uuid();
 export const inputSchema = z.object({
   requestKey: uuid,
@@ -11,12 +12,14 @@ export const inputSchema = z.object({
   body: z.string().trim().max(20000, '正文最多20000字'),
   feeling: z.string().trim().max(5000, '感受最多5000字'),
   uploadIds: z.array(uuid).max(MAX_FILES).default([]),
-  uploadDates: z.array(z.object({id:uuid,occurredOn:z.string()}).strict()).max(MAX_FILES).optional(),
+  confirmUploadTimes: z.boolean().optional(),
+  uploadDates: z.array(z.object({id:uuid,occurredOn:z.string(),confirmedTime:confirmedUploadTime.optional()}).strict()).max(MAX_FILES).optional(),
   coverMediaId: uuid.nullable().optional(),
 }).strict().superRefine((v, ctx) => {
   if (!v.id && !v.body && !v.feeling && !v.uploadIds.length) ctx.addIssue({ code: 'custom', message: '写下这一刻或你的感受后再保存', path: ['body'] });
   if (!!v.id !== !!v.expectedVersion) ctx.addIssue({ code: 'custom', message: '编辑版本无效' });
   if (v.uploadDates && (v.uploadDates.length !== v.uploadIds.length || new Set(v.uploadDates.map(d=>d.id)).size !== v.uploadDates.length || v.uploadDates.some(d=>!v.uploadIds.includes(d.id)))) ctx.addIssue({code:'custom',message:'素材日期与上传文件不一致'});
+  if (v.confirmUploadTimes && v.uploadIds.some(id => !v.uploadDates?.find(d => d.id === id)?.confirmedTime)) ctx.addIssue({code:'custom',message:'请逐份确认素材时间后保存'});
 });
 export type EventInput = z.infer<typeof inputSchema>;
 export function parseEventInput(raw: unknown, today = todayShanghai()): EventInput {

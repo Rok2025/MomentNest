@@ -12,9 +12,10 @@ export async function readCapture(path: string, kind: string) {
     const capturedText = yoyotime.valid ? yoyotime.value : null;
     const capturedZone = capturedText?.match(/(Z|[+-]\d{2}:?\d{2})$/)?.[1] || null;
     return { capturedText, capturedZone: capturedZone === 'Z' ? 'UTC' : capturedZone,
-      capturedOn: captureDate(capturedText), captureSource: 'yoyotime', yoyotime };
+      capturedOn: captureDate(capturedText), captureSource: 'yoyotime', captureReliable: true, yoyotime };
   }
   let capturedText: string | null = null, capturedZone: string | null = null;
+  let captureReliable = kind === 'image';
   try {
     if (kind === 'image') {
       const tags = await exifr.parse(path, { pick: ['DateTimeOriginal', 'OffsetTimeOriginal'], reviveValues: false, gps: false });
@@ -26,6 +27,9 @@ export async function readCapture(path: string, kind: string) {
       const { stdout } = await run(process.env.FFPROBE_PATH || 'ffprobe', ['-v', 'error', '-protocol_whitelist', 'file,pipe', '-show_entries', 'format_tags:stream_tags', '-of', 'json', path], { timeout: 15000, maxBuffer: 1024 * 1024 });
       const probe = JSON.parse(stdout);
       const tags = probe.format?.tags || {};
+      // Generic container creation_time may be export/encoding time. Keep the
+      // desktop import behavior, but do not prefill it as a mobile capture candidate.
+      captureReliable = typeof tags['com.apple.quicktime.creationdate'] === 'string';
       const raw = tags['com.apple.quicktime.creationdate'] || tags.creation_time || probe.streams?.find((s: { tags?: { creation_time?: string } }) => s.tags?.creation_time)?.tags.creation_time;
       if (typeof raw === 'string') {
         capturedText = raw;
@@ -35,5 +39,5 @@ export async function readCapture(path: string, kind: string) {
   } catch { /* Exported files may have no usable metadata; ask for the day in the editor. */ }
   const capturedOn = captureDate(capturedText, capturedZone);
   return { capturedText: capturedOn ? capturedText : null, capturedZone: capturedOn ? capturedZone : null,
-    capturedOn, captureSource: capturedOn ? 'metadata' : null, yoyotime: null };
+    capturedOn, captureSource: capturedOn ? 'metadata' : null, captureReliable, yoyotime: null };
 }

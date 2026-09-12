@@ -5,6 +5,7 @@ import { createHash,randomUUID } from 'node:crypto';
 import { DomainError, inputSchema, type EventRecord, type Member } from '../domain/events';
 import { validEventDate, todayShanghai } from '../domain/dates';
 import type { DayCount } from '../domain/heatmap';
+import { confirmedCopy } from './storage/confirmed-copy';
 export interface Queryable { query(text: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }> }
 export type Transaction = <T>(fn: (db: Queryable) => Promise<T>) => Promise<T>;
 export async function memberFor(db: Queryable, authId: string): Promise<Member> {
@@ -70,6 +71,10 @@ export async function saveEvent(transaction: Transaction, authId: string, raw: u
     if(!validEventDate(input.occurredOn,today)) throw new DomainError('VALIDATION','发生日期须在2025年4月17日至北京时间今天之间');
     if(input.uploadDates?.some(d=>!validEventDate(d.occurredOn,today)))throw new DomainError('VALIDATION','请检查每份素材的日期');
     const allUploads=await lockUploads(db,m,input.uploadIds);
+    for (const upload of allUploads) {
+      const date = input.uploadDates?.find(d => d.id === upload.id);
+      if (date?.confirmedTime) upload.confirmedCopy = await confirmedCopy(upload, date.confirmedTime, date.occurredOn);
+    }
     const groups=new Map<string,Record<string,unknown>[]>();
     for(const upload of allUploads){const day=input.uploadDates?.find(d=>d.id===upload.id)?.occurredOn||input.occurredOn;groups.set(day,[...(groups.get(day)||[]),upload]);}
     // Text belongs only to the selected day. Edits retain the original record and version check.

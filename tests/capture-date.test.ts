@@ -10,6 +10,12 @@ describe('capture date without file modification time',()=>{
  it.each([null,'','1904-01-01T00:00:00Z','0000:00:00 00:00:00','2025:02:30 12:00:00','2025:06:01 25:00:00','not a date'])('rejects unusable metadata %s',raw=>expect(captureDate(raw)).toBeNull());
 });
 describe('capture time display',()=>{
+ it('keeps minute precision from a mobile picker without inventing seconds',()=>{
+  expect(captureDate('2025-06-01T23:30-04:00')).toBe('2025-06-02');
+  expect(formatCaptureTime('2025-06-01T23:30-04:00')).toBe('2025-06-02 11:30（北京时间）');
+  expect(formatCaptureTime('2025-06-01T23:30')).toBe('2025-06-01 23:30（时区未知）');
+  expect(captureDate('2025-06-01T23:99')).toBeNull();
+ });
  it('formats the original UTC timestamp in Beijing time to seconds',()=>{
   expect(formatCaptureTime('2026-09-04T04:26:29.000000Z','UTC')).toBe('2026-09-04 12:26:29（北京时间）');
  });

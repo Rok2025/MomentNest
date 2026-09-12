@@ -5,7 +5,7 @@ import {TEMP_UPLOAD_BYTES,type DraftFile,type DraftBatch,type DuplicateMedia} fr
 import {memberFor,type Transaction,type Queryable} from './event-store';
 
 export async function savedDuplicate(db:Queryable,householdId:string,sha:string,size:number):Promise<DuplicateMedia|null>{
- const {rows}=await db.query(`select m.event_id,e.occurred_on::text as occurred_on from momentnest.media m join momentnest.events e on e.id=m.event_id where m.household_id=$1 and m.sha256=$2 and m.size=$3 order by m.created_at,m.id limit 1`,[householdId,sha,size]);
+ const {rows}=await db.query(`select m.event_id,e.occurred_on::text as occurred_on from momentnest.media m join momentnest.events e on e.id=m.event_id join momentnest.upload_sessions source on source.id=m.upload_session_id where m.household_id=$1 and ((m.sha256=$2 and m.size=$3) or (source.sha256=$2 and source.expected_size=$3)) order by m.created_at,m.id limit 1`,[householdId,sha,size]);
  return rows[0]?{eventId:String(rows[0].event_id),occurredOn:String(rows[0].occurred_on)}:null;
 }
 export type DraftSelection={name:string;size:number;sha256:string;requestKey:string;batchId:string;lastModified?:number};

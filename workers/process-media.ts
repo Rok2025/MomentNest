@@ -48,7 +48,7 @@ export async function processMedia(j:Job,stage:ProcessingStage='full'):Promise<P
     try{await render(fallback);}finally{await rm(fallback,{force:true});}
    }
    const variants=await thumbnails(previewKey,base);
-   return {previewKey,playbackKey:null,capturedText,capturedZone,metadata:{...variants,...captureMetadata,width:variants.previewWidth,height:variants.previewHeight,previewColor:'sRGB'}};
+   return {previewKey,playbackKey:null,capturedText,capturedZone,metadata:{...j.metadata,...variants,...captureMetadata,width:variants.previewWidth,height:variants.previewHeight,previewColor:'sRGB'}};
   }
   const probe=JSON.parse((await run(process.env.FFPROBE_PATH||'ffprobe',['-v','error','-protocol_whitelist','file,pipe','-show_format','-show_streams','-of','json',original],{timeout:30000,maxBuffer:4*1024*1024})).stdout);
   const video=probe.streams?.find((s:{codec_type:string})=>s.codec_type==='video');

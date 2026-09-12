@@ -26,9 +26,9 @@ export function EventEditor({initial,today,memberId,media=[],preview=false,mode=
   async function save(){
     if(preview){setMessage('这是界面预览，请从正式记录入口保存。');return;}
     if(saving.current||!uploadsReady)return;
-    if(!attempt.current&&!uploadDatesReady){setMessage('请先确认每份素材的归档日期，再保存。');return;}
+    if(!attempt.current&&!uploadDatesReady){setMessage('请先确认每份素材的时间和归档日期，再保存。');return;}
     saving.current=true;setBusy(true);onSavingChange?.(true);setMessage('');
-    if(!attempt.current)attempt.current={requestKey:crypto.randomUUID(),...(initial?{id:initial.id,expectedVersion:version}:{}),occurredOn:date,title:'',body,feeling:'',uploadIds:uploads.map(u=>u.id!),uploadDates:uploads.map(u=>({id:u.id!,occurredOn:u.occurredOn!})),...(initial?{coverMediaId:cover}:{})};
+    if(!attempt.current)attempt.current={requestKey:crypto.randomUUID(),...(initial?{id:initial.id,expectedVersion:version}:{}),occurredOn:date,title:'',body,feeling:'',uploadIds:uploads.map(u=>u.id!),...(uploads.some(u=>u.requiresTimeConfirmation)?{confirmUploadTimes:true}:{}),uploadDates:uploads.map(u=>({id:u.id!,occurredOn:u.occurredOn!,...(u.confirmedTime?{confirmedTime:u.confirmedTime}:{})})),...(initial?{coverMediaId:cover}:{})};
     try{
       const result=await submitEvent(attempt.current);
       if(result.ok){try{sessionStorage.removeItem(`momentnest:upload-page:${memberId}`);}catch{}if(onSaved)onSaved(result.id);else{router.push(`/?saved=1&save=${attempt.current.requestKey}#event-${result.id}`);}return;}
@@ -57,7 +57,7 @@ export function EventEditor({initial,today,memberId,media=[],preview=false,mode=
       </fieldset>
       {body.length>20000&&<p role="alert">原有文字已完整保留，请整理到20000字以内后保存。</p>}
       <p aria-live="polite" role="alert">{message}</p>
-      <div className="editor-actions"><button className="primary" disabled={busy||needsLogin||!uploadsReady||(!uncertain&&(!validEventDate(date,max)||(!body.trim()&&!uploads.length&&!initial?.mediaCount)||body.length>20000||!uploadDatesReady))}>{busy?'正在保存…':uncertain?'重试确认这次保存':uploadsReady&&!uploadDatesReady?'请先确认素材日期':saveCount>1?`保存 ${saveCount} 条回忆`:'保存'}</button>{onClose&&<button type="button" disabled={busy} onClick={onClose}>暂时关闭</button>}</div>
+      <div className="editor-actions"><button className="primary" disabled={busy||needsLogin||!uploadsReady||(!uncertain&&(!validEventDate(date,max)||(!body.trim()&&!uploads.length&&!initial?.mediaCount)||body.length>20000||!uploadDatesReady))}>{busy?'正在保存…':uncertain?'重试确认这次保存':uploadsReady&&!uploadDatesReady?'请先确认素材时间':saveCount>1?`保存 ${saveCount} 条回忆`:'保存'}</button>{onClose&&<button type="button" disabled={busy} onClick={onClose}>暂时关闭</button>}</div>
       {uncertain&&<p className="muted">先确认这次保存结果，再修改内容。当前输入保留在此页面。</p>}
     </form>
     {initial&&media.length>0&&<MediaGallery eventId={initial.id} initial={media}/>}

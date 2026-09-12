@@ -3,13 +3,16 @@ import {requireIdentity} from '@/server/auth/session';
 import {transaction} from '@/server/db';
 import {saveEvent} from '@/server/event-store';
 import {checkOrigin,json,apiFailure} from '@/server/http';
+import {mobileUploadAgent} from '@/domain/upload-time';
 
 export async function POST(req:Request){
  try{
   checkOrigin(req);
   const start=performance.now();
   const authId=await requireIdentity(),authenticated=performance.now();
-  const id=await saveEvent(transaction,authId,await req.json()),saved=performance.now();
+  const input=await req.json();
+  if(mobileUploadAgent(req.headers.get('user-agent')||''))input.confirmUploadTimes=true;
+  const id=await saveEvent(transaction,authId,input),saved=performance.now();
   // In a Route Handler this invalidates the next read without rendering the home
   // page inside the save response. The dialog confirms first, then refreshes once.
   revalidatePath('/');revalidatePath(`/events/${id}`);

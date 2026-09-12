@@ -1,5 +1,8 @@
 'use client';
 import {DateField} from './date-field';
+import {UploadTimeConfirmation} from './upload-time-confirmation';
+import {mobileUploadAgent,type ConfirmedUploadTime} from '@/domain/upload-time';
+import {captureDate} from '@/domain/capture-date';
 import {UploadDrafts} from './upload-drafts';
 import {useRef,useEffect,useState} from 'react';
 import {uploadOriginal,type UploadAuth} from '@/domain/upload-original';
@@ -11,8 +14,9 @@ import {fileKind,fileProblem,MAX_FILES} from '@/domain/media';
 import {BIRTHDAY,validEventDate} from '@/domain/dates';
 import {uploadDateReady} from '@/domain/upload-date';
 import type {DraftFile,DuplicateMedia} from '@/domain/upload-draft';
-export type UploadItem={key:string;file:{name:string;size:number;type?:string;lastModified?:number};blob?:File;id?:string;sha256?:string;status:'hashing'|'preparing'|'waiting'|'uploading'|'verifying'|'verified'|'failed';progress:number;uploadedBytes?:number;error?:string;occurredOn?:string;capturedOn?:string|null;capturedText?:string|null;dateEdited?:boolean;dateSaving?:boolean;reused?:boolean;requestKey?:string};
+export type UploadItem={key:string;file:{name:string;size:number;type?:string;lastModified?:number};blob?:File;id?:string;sha256?:string;status:'hashing'|'preparing'|'waiting'|'uploading'|'verifying'|'verified'|'failed';progress:number;uploadedBytes?:number;error?:string;occurredOn?:string;capturedOn?:string|null;capturedText?:string|null;dateEdited?:boolean;dateSaving?:boolean;requiresTimeConfirmation?:boolean;confirmedTime?:ConfirmedUploadTime;capturedZone?:string|null;existingYoyo?:boolean;reused?:boolean;requestKey?:string};
 type Ticket=UploadAuth&{name?:string;duplicate?:DuplicateMedia;reused?:boolean;archiveDate?:string|null};
+const isMobile=()=>mobileUploadAgent(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const accept='image/jpeg,image/png,image/webp,image/heic,image/heif,video/quicktime,video/mp4,.jpg,.jpeg,.png,.webp,.heic,.heif,.mov,.mp4,.m4v';
 export function Uploader({items,onChange,disabled,onExpired,date,today,memberId}:{items:UploadItem[];onChange:(items:UploadItem[])=>void;disabled:boolean;onExpired:()=>void;date:string;today:string;memberId:string}){
  const details=useRef<HTMLDetailsElement>(null),current=useRef(items),mounted=useRef(true),batchId=useRef(''),controllers=useRef(new Map<string,AbortController>());
@@ -45,9 +49,10 @@ export function Uploader({items,onChange,disabled,onExpired,date,today,memberId}
   const result=await api('/api/uploads/complete',{id:item.id});
   if(!present(item.key))return;
   const latest=current.current.find(i=>i.key===item.key)!;
+  if(latest.requiresTimeConfirmation&&result.captureReliable===false){result.capturedOn=null;result.capturedText=null;result.capturedZone=null;}
   const twin=current.current.find(i=>i.key!==item.key&&i.status==='verified'&&i.sha256===result.sha256&&i.file.size===item.file.size);
   if(result.duplicate||twin){reportDuplicate(item,result.duplicate||undefined);if(item.id&&item.id!==twin?.id)await api('/api/uploads/cancel',{id:item.id});return;}
-  patch(item.key,{status:'verified',blob:undefined,sha256:result.sha256,progress:100,uploadedBytes:item.file.size,capturedOn:result.capturedOn,capturedText:result.capturedText,...(!latest.dateEdited?{occurredOn:result.archiveDate||result.capturedOn||'',dateEdited:!!result.archiveDate}:{})});
+  patch(item.key,{status:'verified',blob:undefined,sha256:result.sha256,progress:100,uploadedBytes:item.file.size,capturedOn:result.capturedOn,capturedText:result.capturedText,capturedZone:result.capturedZone,existingYoyo:!!result.yoyotime?.valid,...(!latest.dateEdited&&!latest.confirmedTime?{occurredOn:result.archiveDate||result.capturedOn||'',dateEdited:!!result.archiveDate}:{})});
  }
  async function upload(item:UploadItem,prepared?:Ticket){
   if(!present(item.key))return;
@@ -100,7 +105,7 @@ export function Uploader({items,onChange,disabled,onExpired,date,today,memberId}
   if(!files.length)return;
   if(files.length+(replacement?current.current.length-1:current.current.length)>MAX_FILES){setMessage(`每批最多${MAX_FILES}份素材，请减少选择；恢复的素材可以逐项重新选择原文件。`);return;}
   if(!batchId.current)batchId.current=crypto.randomUUID();setMessage('');
-  const added=files.map(file=>({key:replacement?.key||crypto.randomUUID(),requestKey:crypto.randomUUID(),file:{name:file.name,size:file.size,type:file.type,lastModified:file.lastModified},blob:file,status:'waiting',progress:0} as UploadItem));
+  const added=files.map(file=>({key:replacement?.key||crypto.randomUUID(),requestKey:crypto.randomUUID(),file:{name:file.name,size:file.size,type:file.type,lastModified:file.lastModified},blob:file,requiresTimeConfirmation:isMobile(),status:'waiting',progress:0} as UploadItem));
   publish(replacement?current.current.map(i=>i.key===replacement.key?added[0]:i):[...current.current,...added]);
   for(const item of added){const error=fileProblem(item.file.name,item.file.size);if(error)patch(item.key,{status:'failed',error});else schedule(item,replacement);}
  }
@@ -112,7 +117,7 @@ export function Uploader({items,onChange,disabled,onExpired,date,today,memberId}
  }
  function restore(id:string,files:DraftFile[]){
   batchId.current=id;setMessage('已恢复草稿并开始核验。未传完的文件需要重新选择原文件。');setRestoreNotice('');
-  const restored=files.map(f=>({key:f.id,id:f.id,file:{name:f.name,size:f.size,lastModified:f.lastModified??undefined},sha256:f.sha256||f.clientSha256||undefined,status:'waiting',progress:0,occurredOn:f.archiveDate||'',dateEdited:!!f.archiveDate} as UploadItem));
+  const restored=files.map(f=>({key:f.id,id:f.id,file:{name:f.name,size:f.size,lastModified:f.lastModified??undefined},sha256:f.sha256||f.clientSha256||undefined,status:'waiting',progress:0,requiresTimeConfirmation:isMobile(),occurredOn:f.archiveDate||'',dateEdited:!!f.archiveDate} as UploadItem));
   publish(restored);for(const item of restored)queue.add(item.key,()=>upload(item),item.file.size);
  }
  async function changeDate(item:UploadItem,value:string){
@@ -134,7 +139,7 @@ export function Uploader({items,onChange,disabled,onExpired,date,today,memberId}
  <details className="upload-help"><summary>格式和大小说明</summary><p>每批最多{MAX_FILES}份 · 照片50 MB / 视频1 GB。最多同时上传3份，其中视频最多2份。未保存草稿保留7天；手机刷新后可能需要重新选择未传完的原文件。Live Photo 请分别选择照片和视频。</p></details>
  {items.length>0&&<div className="upload-summary" aria-label="整体上传进度"><div><strong role="status">传输完成 {summary.completed}/{summary.count} · 待保存</strong><span>{summary.percent}%</span></div><progress aria-label="文件传输总进度" max={100} value={summary.percent}/><p>{summary.completed===summary.count?'文件已传输完成，请确认日期并点击保存。':`剩余上传 ${formatUploadBytes(summary.remaining)}`}{summary.failed?` · ${summary.failed} 份失败`:''}</p>{errorSummary.map(error=><p key={error} role="alert" className="upload-attention">{error}</p>)}<small>保存成功后才会收录到回忆。已传完的素材可以从草稿恢复。</small></div>}
  {items.length>0&&<button type="button" disabled={disabled} onClick={leaveDraft}>返回草稿列表</button>}
- {!!pendingDates.length&&<div className="upload-date-notice"><p role="status">{pendingDates.length} 份素材需要确认归档日期，确认后才能保存。</p><button type="button" disabled={disabled} onClick={confirmDates}>去确认日期</button></div>}
- {items.length>0&&<details ref={details} className="upload-details" open={open} onToggle={e=>setOpen(e.currentTarget.open)}><summary><span>文件上传详情 · {items.length} 份</span><span>{open?'收起':'展开'}</span></summary>{open&&<ul className="upload-list">{items.map(item=><li key={item.key}><div className="upload-info"><strong>{item.file.name}</strong><small>{formatUploadBytes(item.file.size)} · {label(item)}</small>{item.reused&&<small>已复用之前的上传任务</small>}{item.status==='verified'&&<div className="media-date">{!item.capturedOn&&<small className="upload-attention">拍摄日期未知，必须确认后保存</small>}<span>{item.dateEdited?'归档日期（已选择）':item.capturedOn?'拍摄日期':'确认归档日期'}</span><DateField label={`${item.file.name}的日期`} min={BIRTHDAY} max={today} required disabled={disabled||item.dateSaving} value={item.occurredOn||''} onChange={value=>void changeDate(item,value)}/>{!item.capturedOn&&!uploadDateReady(item,today)&&<button type="button" disabled={disabled||item.dateSaving} onClick={()=>void changeDate(item,date)}>确认使用记录日期 {date}</button>}</div>}</div>{(item.status==='failed'||item.status==='verified')&&<button type="button" disabled={disabled} onClick={()=>retry(item)}>{item.status==='failed'&&item.blob?'重试':'重新核验'}</button>}{!item.blob&&item.status==='failed'&&<label className="button">重新选择原文件<input className="sr-only" type="file" accept={accept} disabled={disabled} onChange={e=>select(e.currentTarget,item)}/></label>}<button type="button" disabled={disabled} onClick={()=>void remove(item)}>{['uploading','hashing'].includes(item.status)?'取消':'移除'}</button></li>)}</ul>}</details>}
+ {!!pendingDates.length&&<div className="upload-date-notice"><p role="status">{pendingDates.length} 份素材需要确认时间或归档日期，确认后才能保存。</p><button type="button" disabled={disabled} onClick={confirmDates}>去确认时间</button></div>}
+ {items.length>0&&<details ref={details} className="upload-details" open={open} onToggle={e=>setOpen(e.currentTarget.open)}><summary><span>文件上传详情 · {items.length} 份</span><span>{open?'收起':'展开'}</span></summary>{open&&<ul className="upload-list">{items.map(item=><li key={item.key}><div className="upload-info"><strong>{item.file.name}</strong><small>{formatUploadBytes(item.file.size)} · {label(item)}</small>{item.reused&&<small>已复用之前的上传任务</small>}{item.status==='verified'&&(item.requiresTimeConfirmation?<UploadTimeConfirmation name={item.file.name} text={item.capturedText||null} zone={item.capturedZone||null} existingYoyo={!!item.existingYoyo} confirmed={item.confirmedTime} today={today} disabled={disabled} onChange={confirmedTime=>patch(item.key,{confirmedTime,occurredOn:confirmedTime?captureDate(confirmedTime.value)||'':'',dateEdited:!!confirmedTime})}/>:<div className="media-date">{!item.capturedOn&&<small className="upload-attention">拍摄日期未知，必须确认后保存</small>}<span>{item.dateEdited?'归档日期（已选择）':item.capturedOn?'拍摄日期':'确认归档日期'}</span><DateField label={`${item.file.name}的日期`} min={BIRTHDAY} max={today} required disabled={disabled||item.dateSaving} value={item.occurredOn||''} onChange={value=>void changeDate(item,value)}/>{!item.capturedOn&&!uploadDateReady(item,today)&&<button type="button" disabled={disabled||item.dateSaving} onClick={()=>void changeDate(item,date)}>确认使用记录日期 {date}</button>}</div>)}</div>{(item.status==='failed'||item.status==='verified')&&<button type="button" disabled={disabled} onClick={()=>retry(item)}>{item.status==='failed'&&item.blob?'重试':'重新核验'}</button>}{!item.blob&&item.status==='failed'&&<label className="button">重新选择原文件<input className="sr-only" type="file" accept={accept} disabled={disabled} onChange={e=>select(e.currentTarget,item)}/></label>}<button type="button" disabled={disabled} onClick={()=>void remove(item)}>{['uploading','hashing'].includes(item.status)?'取消':'移除'}</button></li>)}</ul>}</details>}
  </section></>;
 }

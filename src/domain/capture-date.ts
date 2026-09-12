@@ -6,7 +6,7 @@ export function captureDate(text: string | null, zone: string | null = null): st
   const normalized = text.trim().replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3').replace(' ', 'T');
   const day = normalized.slice(0, 10);
   if (!isCalendarDate(day) || day < '1970-01-01') return null;
-  const match = normalized.match(/^\d{4}-\d{2}-\d{2}(?:T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/);
+  const match = normalized.match(/^\d{4}-\d{2}-\d{2}(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?(Z|[+-]\d{2}:?\d{2})?$/);
   if (!match || (match[1] && (+match[1] > 23 || +match[2] > 59 || +match[3] > 59))) return null;
   const offset = match[4] || (zone === 'UTC' ? 'Z' : zone);
   if (!offset || !match[1]) return day;
@@ -18,7 +18,7 @@ export function captureDate(text: string | null, zone: string | null = null): st
 export function formatCaptureTime(text: string | null, zone: string | null = null): string {
   if (!text || !captureDate(text, zone)) return '未知';
   const normalized = text.trim().replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3').replace(' ', 'T');
-  const time = normalized.match(/T(\d{2}:\d{2}:\d{2})/);
+  const time = normalized.match(/T(\d{2}:\d{2}(?::\d{2})?)/);
   if (!time) return `${normalized.slice(0, 10)}（时间未知）`;
   const embeddedOffset = normalized.match(/(Z|[+-]\d{2}:?\d{2})$/)?.[1];
   const offset = embeddedOffset || (zone === 'UTC' ? 'Z' : zone);
@@ -31,7 +31,7 @@ export function formatCaptureTime(text: string | null, zone: string | null = nul
     hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
   }).formatToParts(instant);
   const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === type)?.value;
-  return `${part('year')}-${part('month')}-${part('day')} ${part('hour')}:${part('minute')}:${part('second')}（北京时间）`;
+  return `${part('year')}-${part('month')}-${part('day')} ${part('hour')}:${part('minute')}${time[1].length > 5 ? ':' + part('second') : ''}（北京时间）`;
 }
 
 // Compare zoned times in Beijing time; unzoned camera times keep their displayed
@@ -39,7 +39,7 @@ export function formatCaptureTime(text: string | null, zone: string | null = nul
 function captureSortTime(text: string | null, zone: string | null): number | null {
   if (!text || !captureDate(text, zone)) return null;
   const normalized = text.trim().replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3').replace(' ', 'T');
-  if (!/T\d{2}:\d{2}:\d{2}/.test(normalized)) return null;
+  if (!/T\d{2}:\d{2}/.test(normalized)) return null;
   const embeddedOffset = normalized.match(/(Z|[+-]\d{2}:?\d{2})$/)?.[1];
   const offset = zone === 'UTC' ? 'Z' : zone;
   const time = Date.parse(embeddedOffset ? normalized : normalized + (offset && /^(Z|[+-]\d{2}:?\d{2})$/.test(offset) ? offset : '+08:00'));
