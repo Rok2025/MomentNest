@@ -8,7 +8,6 @@ import { DomainError } from '../../domain/events';
 import { captureDate } from '../../domain/capture-date';
 import { confirmedUploadTime, type ConfirmedUploadTime } from '../../domain/upload-time';
 import { objectPath, originalEvidence, fileHash } from './local';
-import { readCapture } from './capture';
 import { readYoyoTime } from './yoyotime';
 
 const run = promisify(execFile);
@@ -49,8 +48,10 @@ export async function confirmedCopy(upload: Record<string, unknown>, confirmatio
     try { await directory.sync(); } finally { await directory.close(); }
     const written = await originalEvidence(key);
     if (written.kind !== evidence.kind || written.mime !== evidence.mime) throw Error('CONTAINER_CHANGED');
-    const capture = await readCapture(output, written.kind);
-    return { key, ...written, capturedText: capture.capturedText, capturedZone: capture.capturedZone,
+    // `result` is the post-write ExifTool readback. Calling readCapture here
+    // would launch ExifTool a third time for the same verified copy.
+    const capturedZone = value.match(/(Z|[+-]\d{2}:?\d{2})$/)?.[1] || null;
+    return { key, ...written, capturedText: value, capturedZone: capturedZone === 'Z' ? 'UTC' : capturedZone,
       metadata: { captureSource: 'yoyotime', yoyotime: result, confirmedOnUpload: true } };
   } catch (error) {
     if (error instanceof DomainError) throw error;

@@ -6,6 +6,9 @@ import { DomainError, inputSchema, type EventRecord, type Member } from '../doma
 import { validEventDate, todayShanghai } from '../domain/dates';
 import type { DayCount } from '../domain/heatmap';
 import { confirmedCopy } from './storage/confirmed-copy';
+import { mapBounded } from '../domain/bounded-parallel';
+
+const CONFIRMED_COPY_CONCURRENCY = 2;
 export interface Queryable { query(text: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }> }
 export type Transaction = <T>(fn: (db: Queryable) => Promise<T>) => Promise<T>;
 export async function memberFor(db: Queryable, authId: string): Promise<Member> {
@@ -71,10 +74,16 @@ export async function saveEvent(transaction: Transaction, authId: string, raw: u
     if(!validEventDate(input.occurredOn,today)) throw new DomainError('VALIDATION','发生日期须在2025年4月17日至北京时间今天之间');
     if(input.uploadDates?.some(d=>!validEventDate(d.occurredOn,today)))throw new DomainError('VALIDATION','请检查每份素材的日期');
     const allUploads=await lockUploads(db,m,input.uploadIds);
-    for (const upload of allUploads) {
+    const confirmations = allUploads.flatMap(upload => {
       const date = input.uploadDates?.find(d => d.id === upload.id);
-      if (date?.confirmedTime) upload.confirmedCopy = await confirmedCopy(upload, date.confirmedTime, date.occurredOn);
-    }
+      return date?.confirmedTime ? [{ upload, date }] : [];
+    });
+    // Each upload has its own locked source and deterministic destination. Keep
+    // file writes bounded so a large mobile batch is faster without overloading
+    // disk or spawning unbounded ExifTool processes.
+    await mapBounded(confirmations, CONFIRMED_COPY_CONCURRENCY, async ({ upload, date }) => {
+      upload.confirmedCopy = await confirmedCopy(upload, date.confirmedTime!, date.occurredOn);
+    });
     const groups=new Map<string,Record<string,unknown>[]>();
     for(const upload of allUploads){const day=input.uploadDates?.find(d=>d.id===upload.id)?.occurredOn||input.occurredOn;groups.set(day,[...(groups.get(day)||[]),upload]);}
     // Text belongs only to the selected day. Edits retain the original record and version check.

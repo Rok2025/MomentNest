@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
-import { mkdtemp, mkdir, rm, readFile, writeFile, readdir } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, rm, readFile, writeFile, readdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -94,4 +94,26 @@ it('a write-tool failure cannot save an event or enqueue media, and retries afte
  expect((await db.query('select id from momentnest.media where upload_session_id=$1', [u.id])).rows).toHaveLength(0);
  expect((await db.query('select request_key from momentnest.save_requests where request_key=$1', [input.requestKey])).rows).toHaveLength(0);
  expect(await saveEvent(tx, auth, input)).toBeTruthy();
+});
+it('waits for an already-started copy, stops the remaining batch, and rolls back every binding', async () => {
+ const first = await fixture(), second = await fixture(), third = await fixture();
+ const value = '2025-06-01T10:15:00+08:00';
+ const input = {
+  requestKey: randomUUID(), title: '', body: '', feeling: '', occurredOn: '2025-06-01', confirmUploadTimes: true,
+  uploadIds: [String(first.u.id), String(second.u.id), String(third.u.id)],
+  uploadDates: [
+   // This fails before any filesystem work. The second item is already active;
+   // the third must not be claimed after the bounded queue sees the failure.
+   { id: String(first.u.id), occurredOn: '2025-06-02', confirmedTime: { value } },
+   { id: String(second.u.id), occurredOn: '2025-06-01', confirmedTime: { value } },
+   { id: String(third.u.id), occurredOn: '2025-06-01', confirmedTime: { value } },
+  ],
+ };
+ await expect(saveEvent(tx, auth, input)).rejects.toMatchObject({ code: 'VALIDATION' });
+ const states = await db.query<{ id: string; state: string }>('select id,state from momentnest.upload_sessions where id=any($1::uuid[])', [input.uploadIds]);
+ expect(states.rows.every(row => row.state === 'verified')).toBe(true);
+ expect((await db.query('select id from momentnest.media where upload_session_id=any($1::uuid[])', [input.uploadIds])).rows).toHaveLength(0);
+ expect((await db.query('select request_key from momentnest.save_requests where request_key=$1', [input.requestKey])).rows).toHaveLength(0);
+ await expect(access(objectPath(String(second.u.object_key).replace(/\.bin$/, '-c.bin')))).resolves.toBeUndefined();
+ await expect(access(objectPath(String(third.u.object_key).replace(/\.bin$/, '-c.bin')))).rejects.toThrow();
 });

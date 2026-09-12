@@ -5,9 +5,9 @@ import { BIRTHDAY, validEventDate } from '@/domain/dates';
 import { captureDate, formatCaptureTime } from '@/domain/capture-date';
 import { captureValue, type ConfirmedUploadTime } from '@/domain/upload-time';
 
-export function UploadTimeConfirmation({ name, text, zone, existingYoyo, confirmed, today, disabled, onChange }: {
+export function UploadTimeConfirmation({ name, text, zone, existingYoyo, confirmed, automatic, today, disabled, onChange }: {
   name: string; text: string | null; zone: string | null; existingYoyo: boolean;
-  confirmed?: ConfirmedUploadTime; today: string; disabled: boolean;
+  confirmed?: ConfirmedUploadTime; automatic?: boolean; today: string; disabled: boolean;
   onChange: (value?: ConfirmedUploadTime) => void;
 }) {
   const candidate = captureValue(text, zone);
@@ -24,9 +24,9 @@ export function UploadTimeConfirmation({ name, text, zone, existingYoyo, confirm
     {candidate ? <small>{existingYoyo ? '文件已有 yoyotime' : '文件中的时间（请核对）'}：{formatCaptureTime(text, zone)}</small>
       : <small className="upload-attention">未找到可靠时间，请选择采用的日期；具体时刻可留空。</small>}
     {confirmed ? <>
-      <strong>已确认：{formatCaptureTime(confirmed.value)}</strong>
+      <strong>{automatic ? '已自动采用' : '已确认'}：{formatCaptureTime(confirmed.value)}</strong>
       <small>归档到 {captureDate(confirmed.value)}</small>
-      <button type="button" disabled={disabled} onClick={() => { invalidate(); setEditing(true); }}>重新选择时间</button>
+      <button type="button" disabled={disabled} onClick={() => { invalidate(); setEditing(true); }}>修改时间</button>
     </> : <>
       {candidate && !editing && <>
         <button type="button" disabled={disabled || !validEventDate(captureDate(candidate) || '', today)} onClick={() => onChange({ value: existingYoyo ? text! : candidate })}>确认采用文件中的时间</button>
