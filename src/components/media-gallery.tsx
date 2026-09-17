@@ -1,5 +1,5 @@
 'use client';
-import { useEffect,useState,useRef } from 'react';
+import { useEffect,useState,useRef,type ReactNode } from 'react';
 import bufferStyles from './video-buffer.module.css';
 import { mediaPending,mediaStatusText,reusePreview,type MediaRecord,type PreviewLinks } from '@/domain/media';
 import { pollWhileVisible } from '@/domain/visible-poll';
@@ -13,7 +13,7 @@ function coverVariant(media:MediaRecord){
  let hash=0;for(const character of media.id)hash=(hash*31+character.charCodeAt(0))>>>0;
  return ['dawn','moss','paper','film'][hash%4];
 }
-export function MediaView({media,compact=false,priority=false,thumbnail=false,immersive=false,onRetry,onPlaybackChange}:{media:MediaRecord;compact?:boolean;priority?:boolean;thumbnail?:boolean;immersive?:boolean;onRetry?:()=>void;onPlaybackChange?:(playing:boolean)=>void}){
+export function MediaView({media,compact=false,priority=false,thumbnail=false,immersive=false,compactOverlay,onRetry,onPlaybackChange}:{media:MediaRecord;compact?:boolean;priority?:boolean;thumbnail?:boolean;immersive?:boolean;compactOverlay?:ReactNode;onRetry?:()=>void;onPlaybackChange?:(playing:boolean)=>void}){
  const [renewed,setRenewed]=useState<{source:string|undefined;links:PreviewLinks}|null>(null);
  const preview=renewed&&renewed.source===media.preview?.url?renewed.links:media.preview;
  const [playback,setPlayback]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
@@ -46,7 +46,7 @@ export function MediaView({media,compact=false,priority=false,thumbnail=false,im
     // Private, pre-generated variants use browser srcSet; do not pass signed URLs through a public image optimizer.
     // eslint-disable-next-line @next/next/no-img-element
     <img src={preview.url} srcSet={preview.srcSet} sizes={immersive?'100vw':thumbnail?'(max-width: 650px) 28vw, 150px':compact?'(max-width: 650px) calc(100vw - 104px), (max-width: 1120px) 40vw, 450px':'(max-width: 650px) calc(100vw - 74px), 760px'} width={preview.width} height={preview.height} alt={compact?'回忆封面':media.filename} loading={priority?'eager':'lazy'} fetchPriority={priority?'high':'auto'} decoding="async" draggable={!immersive} onError={imageError}/>:
-    <div className={`media-placeholder ${compact?'default-cover':''}`} data-cover={coverVariant(media)}><span aria-hidden="true">{media.kind==='video'?'▷':'▧'}</span><p className={compact?'sr-only':undefined} role="status">{compact?compactStatus:status}</p></div>;
+    <div className={`media-placeholder ${compact?'default-cover':''}`} data-cover={coverVariant(media)}><span aria-hidden="true">{media.kind==='video'?'▷':'▧'}</span><p className={compact?'sr-only':undefined} role="status">{compact?compactStatus:status}</p>{compact&&compactOverlay}</div>;
  return <figure className={`media-item ${compact?'compact':''} status-${media.status} kind-${media.kind} ${media.needsTimeReview&&!immersive?'time-review':''}`}>
   {media.kind==='video'&&!compact?<div className="video-surface">
    {visual}
@@ -56,6 +56,7 @@ export function MediaView({media,compact=false,priority=false,thumbnail=false,im
     {busy&&<span className="video-play-status" role="status">正在加载视频…</span>}
    </button>}
   </div>:visual}
+  {compact&&preview&&!error&&compactOverlay}
   {media.needsTimeReview&&!immersive&&<span className="media-time-review-badge">待修改时间</span>}
   {compact&&media.kind==='video'&&<span className="video-badge">▷ {media.status==='ready'?'视频':status}</span>}
   {immersive&&(error||media.status==='failed'||(preview&&media.status!=='ready'))&&<div className="media-feedback" role="status">
