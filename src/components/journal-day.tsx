@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 import {useEffect,useState} from 'react';
 import {MediaView} from './media-gallery';
 import {MediaViewer} from './media-viewer';
@@ -84,7 +85,7 @@ export function JournalDay({day,index,total,initialMedia,onMediaChange}:{day:Day
     {allMedia.length>0&&<section className={styles.section} aria-label={`${day.date}的照片与视频`}>
      <div className={styles.mediaHeading}><h3>这一天的画面<span>· {initialMedia.total}</span></h3></div>
      <div className={styles.wall}>{visibleMedia.map((item,i)=>{const uploader=item.uploader;return <button key={item.id} type="button" className={styles.thumbnail} data-kind={item.kind} data-state={item.status} aria-label={`查看${item.kind==='video'?'视频':'照片'}：${item.filename}${uploader?`，${uploader}录制`:''}${item.needsTimeReview?'，待修改时间':''}`} onClick={()=>setSelected(item.id)}>
-      <MediaView media={item} compact thumbnail priority={index===0&&i<3} compactOverlay={uploader?<span className={styles.mediaAuthor} data-author={uploader} aria-hidden="true"/>:undefined}/>
+      <MediaView media={item} compact thumbnail priority={index===0&&i<3} compactOverlay={uploader?<span className={styles.mediaAuthor} data-author={uploader} aria-hidden="true"><Image src={uploader==='爸爸'?'/member-avatars/father-avatar-cartoon-128.png':'/member-avatars/mother-avatar-cartoon-128.png'} width={128} height={128} alt="" unoptimized decoding="async"/></span>:undefined}/>
      </button>;})}</div>
      {!expanded&&moreMediaCount>0&&<div className={styles.expand}><button type="button" disabled={loading} onClick={()=>void expand()}>{loading?`正在展开 ${initialMedia.total} 份素材…`:`展示更多（还有 ${moreMediaCount} 份）`}</button>{error&&<p role="alert">{error}</p>}</div>}
     </section>}

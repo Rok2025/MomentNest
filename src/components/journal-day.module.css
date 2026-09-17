@@ -15,9 +15,9 @@
 .thumbnail :global(.media-item.compact){height:100%;aspect-ratio:1;border-radius:10px;width:100%}
 .thumbnail :global(.media-item.compact) img{height:100%;object-fit:cover}
 .thumbnail :global(.media-placeholder){min-height:0;height:100%;padding:8px;font-size:10px}
-.thumbnail :global(.media-placeholder)>span{display:none}
+.thumbnail :global(.media-placeholder)>span:not(.mediaAuthor){display:none}
 .thumbnail :global(.video-badge){bottom:5px;right:5px;padding:1px 5px;font-size:10px;border-radius:5px}
-.mediaAuthor{position:absolute;top:2px;left:2px;z-index:2;width:52px;height:52px;border:2px solid #fffef9;border-radius:50%;background-position:center;background-repeat:no-repeat;background-size:cover;box-shadow:0 2px 8px #34433445;pointer-events:none}.mediaAuthor[data-author='爸爸']{background-color:#b8c6af;background-image:url('/member-avatars/father-avatar-cartoon.png')}.mediaAuthor[data-author='妈妈']{background-color:#e6b49d;background-image:url('/member-avatars/mother-avatar-cartoon.png')}
+.mediaAuthor{position:absolute;top:2px;left:2px;z-index:2;width:52px;height:52px;overflow:hidden;border:2px solid #fffef9;border-radius:50%;background:#e6b49d;box-shadow:0 2px 8px #34433445;pointer-events:none}.mediaAuthor[data-author='爸爸']{background-color:#b8c6af}.mediaAuthor img{display:block;width:100%;height:100%;object-fit:cover}
 .thumbnail [data-cover] .mediaAuthor{top:calc(10% + 2px);left:calc(10% + 2px)}
 .thumbnail:hover img{filter:brightness(.94)}.thumbnail:hover{box-shadow:0 4px 12px #4a674420}.thumbnail[data-state=failed]{background:#ecefe7}
 .text+.text{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
