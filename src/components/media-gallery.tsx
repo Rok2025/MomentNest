@@ -9,6 +9,10 @@ export async function getMediaLink(id:string,variant:string):Promise<{url:string
  if(!r.ok)throw Error('素材暂不可用，请重新登录或稍后重试');
  return r.json();
 }
+function coverVariant(media:MediaRecord){
+ let hash=0;for(const character of media.id)hash=(hash*31+character.charCodeAt(0))>>>0;
+ return ['dawn','moss','paper','film'][hash%4];
+}
 export function MediaView({media,compact=false,priority=false,thumbnail=false,immersive=false,onRetry,onPlaybackChange}:{media:MediaRecord;compact?:boolean;priority?:boolean;thumbnail?:boolean;immersive?:boolean;onRetry?:()=>void;onPlaybackChange?:(playing:boolean)=>void}){
  const [renewed,setRenewed]=useState<{source:string|undefined;links:PreviewLinks}|null>(null);
  const preview=renewed&&renewed.source===media.preview?.url?renewed.links:media.preview;
@@ -35,14 +39,15 @@ export function MediaView({media,compact=false,priority=false,thumbnail=false,im
   catch{setError('重试失败，请稍后再试');}finally{setBusy(false);}
  }
  const status=mediaStatusText(media);
+ const compactStatus=error?'预览暂时不可用':media.status==='failed'?'原件已保存 · 点开重试':media.kind==='video'?'正在准备视频封面':'正在整理照片预览';
  const visual=media.kind==='video'&&playback&&!compact?
    <video key={playback} ref={video} src={playback} poster={preview?.url} controls playsInline preload="auto" onLoadedMetadata={()=>{if(video.current&&resume.current)video.current.currentTime=resume.current;void startPlayback();}} onPlay={()=>{setNeedsPlay(false);onPlaybackChange?.(true);}} onPlaying={()=>setBuffering(false)} onWaiting={()=>setBuffering(true)} onPause={()=>{setBuffering(false);onPlaybackChange?.(false);}} onEnded={()=>{setBuffering(false);onPlaybackChange?.(false);}} onError={()=>{setBuffering(false);onPlaybackChange?.(false);setError('播放链接可能已过期，请刷新播放链接后继续。');}}/>:
-   preview?
+   preview&&!error?
     // Private, pre-generated variants use browser srcSet; do not pass signed URLs through a public image optimizer.
     // eslint-disable-next-line @next/next/no-img-element
     <img src={preview.url} srcSet={preview.srcSet} sizes={immersive?'100vw':thumbnail?'(max-width: 650px) 28vw, 150px':compact?'(max-width: 650px) calc(100vw - 104px), (max-width: 1120px) 40vw, 450px':'(max-width: 650px) calc(100vw - 74px), 760px'} width={preview.width} height={preview.height} alt={compact?'回忆封面':media.filename} loading={priority?'eager':'lazy'} fetchPriority={priority?'high':'auto'} decoding="async" draggable={!immersive} onError={imageError}/>:
-    <div className="media-placeholder"><span aria-hidden="true">{media.kind==='video'?'▷':'▧'}</span><p role="status">{status}</p></div>;
- return <figure className={`media-item ${compact?'compact':''} ${media.needsTimeReview&&!immersive?'time-review':''}`}>
+    <div className={`media-placeholder ${compact?'default-cover':''}`} data-cover={coverVariant(media)}><span aria-hidden="true">{media.kind==='video'?'▷':'▧'}</span><p className={compact?'sr-only':undefined} role="status">{compact?compactStatus:status}</p></div>;
+ return <figure className={`media-item ${compact?'compact':''} status-${media.status} kind-${media.kind} ${media.needsTimeReview&&!immersive?'time-review':''}`}>
   {media.kind==='video'&&!compact?<div className="video-surface">
    {visual}
    {playback&&buffering&&!needsPlay&&<div className={bufferStyles.buffer} role="status"><span>视频缓冲中，请稍候…</span></div>}
@@ -53,7 +58,6 @@ export function MediaView({media,compact=false,priority=false,thumbnail=false,im
   </div>:visual}
   {media.needsTimeReview&&!immersive&&<span className="media-time-review-badge">待修改时间</span>}
   {compact&&media.kind==='video'&&<span className="video-badge">▷ {media.status==='ready'?'视频':status}</span>}
-  {compact&&error&&<span className="media-load-error">预览暂不可用，点开重试</span>}
   {immersive&&(error||media.status==='failed'||(preview&&media.status!=='ready'))&&<div className="media-feedback" role="status">
    <span>{error||status}</span>
    {error&&<button type="button" disabled={busy} onClick={()=>void (playback?play(true):refreshPreview())}>重试</button>}

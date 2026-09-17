@@ -15,7 +15,8 @@ export function validEventDate(value: string, today = todayShanghai()): boolean 
 function clamped(year: number, month: number, day: number): Date {
   return new Date(Date.UTC(year, month, Math.min(day, new Date(Date.UTC(year, month + 1, 0)).getUTCDate())));
 }
-export function ageOn(value: string): string {
+export type AgeParts = { years: number; months: number; days: number };
+export function agePartsOn(value: string): AgeParts {
   if (!isCalendarDate(value) || value < BIRTHDAY) throw new Error('Invalid age date');
   const end = new Date(`${value}T00:00:00Z`);
   let years = end.getUTCFullYear() - 2025;
@@ -25,6 +26,10 @@ export function ageOn(value: string): string {
   while (months < 11 && clamped(anniversary.getUTCFullYear(), anniversary.getUTCMonth() + months + 1, anniversary.getUTCDate()) <= end) months++;
   const anchor = clamped(anniversary.getUTCFullYear(), anniversary.getUTCMonth() + months, anniversary.getUTCDate());
   const days = Math.round((end.valueOf() - anchor.valueOf()) / 86400000);
+  return { years, months, days };
+}
+export function ageOn(value: string): string {
+  const { years, months, days } = agePartsOn(value);
   return `${years}岁${months}个月${days}天`;
 }
 export function displayTimestamp(iso: string): string {

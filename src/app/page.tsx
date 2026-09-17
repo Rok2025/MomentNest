@@ -8,6 +8,7 @@ import { database,prepareDatabase } from '@/server/db';
 import { timed } from '@/server/timing';
 import { homeData } from '@/server/event-store';
 import { todayShanghai,isCalendarDate } from '@/domain/dates';
+import { timelineAuthors,timelineKinds,type TimelineFilters } from '@/domain/timeline-filters';
 import { Unavailable } from '@/components/shell';
 import { HomeJournal } from '@/components/home-journal';
 export const dynamic='force-dynamic';
@@ -28,11 +29,12 @@ function HomeLoading(){
 }
 async function HomeContent({searchParams,authId}:HomeProps&{authId:string}){
  const q=await searchParams,today=todayShanghai(),range=q.start&&q.end&&isCalendarDate(q.start)&&isCalendarDate(q.end)&&q.start<=q.end?{start:q.start,end:q.end}:undefined;
+ const filters:TimelineFilters={kind:timelineKinds.find(kind=>kind===q.kind),author:timelineAuthors.find(author=>author===q.author)};
  const pages=Math.max(1,Math.min(50,Number.parseInt(q.pages||'1')||1));
  let data:Awaited<ReturnType<typeof homeData>>;
- try{data=await timed('home.data',async()=>{await prepareDatabase();return homeData(database(),authId,range,pages,true);});}catch(error){
+ try{data=await timed('home.data',async()=>{await prepareDatabase();return homeData(database(),authId,range,pages,true,filters);});}catch(error){
   return <Unavailable message={error instanceof DomainError&&error.code==='FORBIDDEN'?'此账号尚未加入家庭，或已停用。':'暂时读不到回忆，请稍后再试。'}/>;
  }
  const {member,page,days}=data;
-  return <HomeJournal label={member.label} memberId={member.id} today={today} initial={page} days={days} initialRange={range} initialPages={pages} saved={q.saved==='1'}/>;
+  return <HomeJournal label={member.label} memberId={member.id} today={today} initial={page} days={days} initialRange={range} initialFilters={filters} initialPages={pages} saved={q.saved==='1'}/>;
 }

@@ -7,7 +7,7 @@ import { randomUUID,createHash } from 'node:crypto';
 import sharp from 'sharp';
 import { beforeAll,beforeEach,afterAll,describe,it,expect,vi } from 'vitest';
 import { saveEvent,listEvents,type Transaction } from '../src/server/event-store';
-import { authorizeUpload,completeUpload,listMedia,listEventCovers } from '../src/server/media-store';
+import { authorizeUpload,completeUpload,listMedia,listDayMedia,listEventCovers } from '../src/server/media-store';
 import { claimJob,finishJob,finishPreviewJob } from '../src/server/job-store';
 import { previewSizes,previewLinks } from '../src/server/media-preview';
 import { objectPath,verifyTicket } from '../src/server/storage/local';
@@ -44,8 +44,8 @@ describe('independent preview/video lanes and private cover reads',()=>{
   await finishJob(tx,job,poster(job.mediaId));
   expect((await listMedia(db,father,ours.id))[0].needsTimeReview).toBe(true);
   const page=await listEvents(db,father,undefined,undefined,true);
-  expect(page.items.find(e=>e.id===ours.id)?.media?.[0].needsTimeReview).toBe(true);
-  expect((await listEventCovers(db,father,[ours.id],true))[0].media[0].needsTimeReview).toBe(true);
+  expect(page.dayMedia['2025-06-01'].items.find(media=>media.id===ours.media.id)?.needsTimeReview).toBe(true);
+  expect((await listEventCovers(db,father,[ours.id],true))[0].cover?.needsTimeReview).toBe(true);
  });
 
  it('先发布视频封面，转码占用期间照片仍可领取，最终保留已发布封面',async()=>{
@@ -88,9 +88,9 @@ describe('independent preview/video lanes and private cover reads',()=>{
   const ours=await event(),theirs=await event('image',other);
   const j=(await claimJob(tx,'preview'))!;expect(j.mediaId).toBe(ours.media.id);await finishJob(tx,j,poster(j.mediaId));
   const queries:string[]=[];const counted={query:async(sql:string,args?:unknown[])=>{queries.push(sql);return db.query<Record<string,unknown>>(sql,args);}};
-  const page=await listEvents(counted,father,undefined,undefined,true);expect(queries).toHaveLength(2);
+  const page=await listEvents(counted,father,undefined,undefined,true);expect(queries).toHaveLength(3);
   const cover=page.items.find(e=>e.id===ours.id)!.cover!;
-  const gallery=page.items.find(e=>e.id===ours.id)!.media!;expect(gallery.map(m=>m.id)).toEqual([ours.media.id]);expect(gallery[0].preview).toBeDefined();expect(gallery[0]).not.toHaveProperty('object_key');expect(gallery[0]).not.toHaveProperty('metadata');
+  const gallery=page.dayMedia['2025-06-01'].items;const oursInGallery=gallery.find(media=>media.id===ours.media.id)!;expect(oursInGallery.preview).toBeDefined();expect(oursInGallery).not.toHaveProperty('object_key');expect(oursInGallery).not.toHaveProperty('metadata');
   expect(cover.hasPreview).toBe(true);expect(cover.preview?.srcSet).toContain('960w');
   const signed=verifyTicket(new URL(cover.preview!.url).searchParams.get('ticket')!);
   expect(signed).toMatchObject({operation:'get',mime:'image/jpeg',key:poster(j.mediaId).previewKey});
@@ -98,7 +98,7 @@ describe('independent preview/video lanes and private cover reads',()=>{
   expect(cover).not.toHaveProperty('metadata');expect(cover).not.toHaveProperty('object_key');
   queries.length=0;
   const covers=await listEventCovers(counted,father,[ours.id,theirs.id],true);
-  expect(queries).toHaveLength(2);expect(covers.map(e=>e.eventId)).toEqual([ours.id]);expect(covers[0].media.map(m=>m.id)).toEqual([ours.media.id]);expect(covers[0].media[0].preview).toBeDefined();
+  expect(queries).toHaveLength(2);expect(covers.map(e=>e.eventId)).toEqual([ours.id]);expect(covers[0].cover?.id).toBe(ours.media.id);expect(covers[0].cover?.preview).toBeDefined();
   await db.query('update momentnest.members set active=false where auth_user_id=$1',[father]);
   try{await expect(listEventCovers(db,father,[ours.id],true)).rejects.toMatchObject({code:'FORBIDDEN'});}
   finally{await db.query('update momentnest.members set active=true where auth_user_id=$1',[father]);}
@@ -125,5 +125,13 @@ describe('independent preview/video lanes and private cover reads',()=>{
   expect(mediaStatusText(media)).toBe('原件已保存，等待处理');
   expect(mediaStatusText({...media,status:'processing'})).toBe('正在生成视频封面');
   expect(mediaStatusText({...media,hasPreview:true,status:'processing'})).toBe('封面已生成，正在生成播放版');
+ });
+ it('同页媒体首屏只取16项，展开接口继续按50项分页',async()=>{
+  for(let i=0;i<17;i++)await event();
+  const first=await listDayMedia(db,father,'2025-06-01',0,16,true);
+  expect(first.items).toHaveLength(16);expect(first.total).toBeGreaterThanOrEqual(17);expect(first.nextOffset).toBe(16);
+  const second=await listDayMedia(db,father,'2025-06-01',first.nextOffset!,50,true);
+  expect(second.items.length).toBeGreaterThan(0);expect(second.items.length).toBeLessThanOrEqual(50);
+  expect(new Set([...first.items,...second.items].map(media=>media.id)).size).toBe(first.items.length+second.items.length);
  });
 });

@@ -27,6 +27,15 @@ describe('真实PostgreSQL引擎中的迁移与事件事务（隔离测试，不
  it('妈妈补充爸爸记录，作者/创建日不变，编辑人更新且有冲突保护',async()=>{const id=await saveEvent(tx,father,input()),first=await getEvent(db,father,id);const update={...input(),id,expectedVersion:1,body:'妈妈补充'};expect(await saveEvent(tx,mother,update)).toBe(id);expect(await saveEvent(tx,mother,update)).toBe(id);const latest=await getEvent(db,mother,id);expect(latest.author).toBe('爸爸');expect(latest.editor).toBe('妈妈');expect(latest.version).toBe(2);expect(latest.createdAt).toBe(first.createdAt);await expect(saveEvent(tx,father,{...input(),id,expectedVersion:1})).rejects.toMatchObject({code:'CONFLICT'});});
  it('日期校验拒绝未来与无效，补录按实际日排序',async()=>{await expect(saveEvent(tx,father,{...input(),occurredOn:'2026-09-09'},'2026-09-08')).rejects.toMatchObject({code:'VALIDATION'});await expect(saveEvent(tx,father,{...input(),occurredOn:'2026-02-30'},'2026-09-08')).rejects.toMatchObject({code:'VALIDATION'});const id=await saveEvent(tx,father,{...input(),occurredOn:'2026-01-01'});expect((await listEvents(db,father)).items[0].id).toBe(id);});
  it('同日分页不重不漏',async()=>{for(let i=0;i<22;i++)await saveEvent(tx,father,input());const first=await listEvents(db,father),second=await listEvents(db,father,first.next!);expect(first.items.length).toBe(20);expect(first.next).not.toBeNull();const ids=[...first.items,...second.items].map(e=>e.id);expect(new Set(ids).size).toBe(ids.length);});
+ it('时间线可按记录者和文字内容筛选',async()=>{
+  const range={start:'2025-12-30',end:'2025-12-31'};
+  const fatherId=await saveEvent(tx,father,{...input(),occurredOn:'2025-12-31',body:'爸爸写下的冬日小事'});
+  const motherId=await saveEvent(tx,mother,{...input(),occurredOn:'2025-12-30',body:'妈妈写下的冬日小事'});
+  const fatherOnly=await listEvents(db,father,undefined,range,false,{author:'爸爸'});
+  const textOnly=await listEvents(db,father,undefined,range,false,{kind:'text'});
+  expect(fatherOnly.items.map(event=>event.id)).toEqual([fatherId]);
+  expect(textOnly.items.map(event=>event.id)).toEqual([fatherId,motherId]);
+ });
  it('保存请求失败会回滚整个事件',async()=>{const count=async()=>Number((await db.query<{n:number}>('select count(*) as n from momentnest.events')).rows[0].n);const before=await count();await expect(saveEvent(async fn=>db.transaction(async t=>{await fn(t);throw new Error('simulated transaction failure');}),father,input())).rejects.toThrow();expect(await count()).toBe(before);});
  it('成员停用后已知事件ID也不能访问',async()=>{const id=await saveEvent(tx,father,input());await db.query('update momentnest.members set active=false where auth_user_id=$1',[mother]);await expect(getEvent(db,mother,id)).rejects.toMatchObject({code:'FORBIDDEN'});await db.query('update momentnest.members set active=true where auth_user_id=$1',[mother]);});
  it('非公开schema、运行角色无删除/成员写入/DDL，但允许保存',async()=>{const result=await db.query("select has_schema_privilege('anon','momentnest','usage') as anon,has_table_privilege('momentnest_app','momentnest.events','delete') as del,has_table_privilege('momentnest_app','momentnest.members','update') as member_update,has_schema_privilege('momentnest_app','momentnest','create') as ddl");expect(result.rows[0]).toEqual({anon:false,del:false,member_update:false,ddl:false});await db.exec('set role momentnest_app');try{await saveEvent(tx,father,input());}finally{await db.exec('reset role');}});
@@ -38,11 +47,15 @@ describe('真实PostgreSQL引擎中的迁移与事件事务（隔离测试，不
   const range={start:'2025-04-17',end:'2025-04-17'};
   const data=await homeData(counted,father,range,2);
   const first=await listEvents(db,father,undefined,range),second=await listEvents(db,father,first.next!,range);
-  expect(data.page).toEqual({items:[...first.items,...second.items],next:second.next});
+  expect(data.page).toEqual({items:[...first.items,...second.items],next:second.next,dayMedia:{...first.dayMedia,...second.dayMedia}});
   expect(data.days).toEqual(await heatmapCounts(db,father));
   expect(data.member.label).toBe('爸爸');
   expect(queries.filter(sql=>sql.includes('auth_user_id=$1'))).toHaveLength(1);
-  expect(queries).toHaveLength(4);
+  // The requested second cursor page can contain no rows when test data share
+  // one millisecond. It then has no day-media batch; neither path repeats the
+  // one membership lookup above.
+  expect(queries.length).toBeGreaterThanOrEqual(5);
+  expect(queries.length).toBeLessThanOrEqual(6);
  });
  it('首页不会跨请求缓存权限，停用成员后立即拒绝且不读取回忆',async()=>{
   await homeData(db,mother);

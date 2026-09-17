@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="820" viewBox="0 0 1600 820" role="img" aria-labelledby="title desc">
+  <title id="title">MomentNest 时光记顶栏视觉方案</title>
+  <desc id="desc">56 像素高的手账风顶栏。左侧为时光记品牌，中间为又又的成长状态，右侧为筛选、记录、账号和退出操作；仅记下一刻使用实心绿色。</desc>
+  <defs>
+    <pattern id="grain" width="10" height="10" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.7" fill="#9eae96" opacity="0.18"/>
+    </pattern>
+    <filter id="shadow" x="-10%" y="-20%" width="120%" height="160%">
+      <feDropShadow dx="0" dy="6" stdDeviation="9" flood-color="#485c42" flood-opacity="0.10"/>
+    </filter>
+    <filter id="softShadow" x="-10%" y="-20%" width="120%" height="160%">
+      <feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#485c42" flood-opacity="0.07"/>
+    </filter>
+    <style>
+      .sans { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', sans-serif; }
+      .serif { font-family: Georgia, 'Songti SC', 'STSong', serif; }
+      .ink { fill: #344334; }
+      .muted { fill: #75806f; }
+      .tiny { font-size: 12px; }
+      .small { font-size: 13px; }
+      .button { font-size: 14px; font-weight: 600; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="820" fill="#f8f6f0"/>
+  <rect width="1600" height="820" fill="url(#grain)"/>
+
+  <!-- A restrained content column gives the fixed header room to breathe. -->
+  <g transform="translate(160 0)">
+    <rect x="0" y="0" width="1280" height="56" fill="#fffef9" filter="url(#softShadow)"/>
+    <line x1="0" y1="55.5" x2="1280" y2="55.5" stroke="#d8dfd0"/>
+
+    <!-- Left: brand -->
+    <text x="32" y="36" class="serif ink" font-size="21" font-weight="600" letter-spacing="0.6">时光记</text>
+    <circle cx="129" cy="29" r="2.5" fill="#a2b691"/>
+    <text x="141" y="34" class="sans muted tiny" letter-spacing="0.4">又又的成长手账</text>
+
+    <!-- Middle: status, deliberately text rather than a competing button/card -->
+    <g transform="translate(560 0)">
+      <line x1="0" y1="20" x2="0" y2="36" stroke="#d8dfd0"/>
+      <text x="18" y="33" class="sans muted small">又又</text>
+      <circle cx="53" cy="28" r="2" fill="#a2b691"/>
+      <text x="65" y="33" class="sans muted small">1 岁 5 个月</text>
+    </g>
+
+    <!-- Right: one primary action, all controls share the 36px rhythm. -->
+    <g transform="translate(844 10)">
+      <rect x="0" y="0" width="66" height="36" rx="10" fill="#fffef9" stroke="#d8dfd0"/>
+      <text x="33" y="23" text-anchor="middle" class="sans ink button" font-weight="500">筛选</text>
+
+      <rect x="78" y="0" width="126" height="36" rx="10" fill="#4b6744"/>
+      <text x="141" y="23" text-anchor="middle" class="sans" font-size="14" font-weight="600" fill="#ffffff">＋ 记下一刻</text>
+
+      <rect x="220" y="0" width="94" height="36" rx="18" fill="#eef3e8" stroke="#d4dec9"/>
+      <circle cx="240" cy="18" r="11" fill="#65815c"/>
+      <text x="240" y="22" text-anchor="middle" class="sans" font-size="10" font-weight="700" fill="#ffffff">爸</text>
+      <text x="270" y="23" class="sans ink" font-size="13" font-weight="500">爸爸</text>
+      <path d="M295 15 l4 4 l4 -4" fill="none" stroke="#75806f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <text x="334" y="23" class="sans muted small">退出</text>
+    </g>
+
+    <!-- Context only: the header stays quiet above the memory timeline. -->
+    <g transform="translate(0 112)">
+      <text x="640" y="0" text-anchor="middle" class="serif" font-size="30" fill="#5e7552">2026 年 9 月</text>
+      <line x1="594" y1="16" x2="686" y2="16" stroke="#cfdac7"/>
+
+      <line x1="640" y1="68" x2="640" y2="658" stroke="#d8dfd0" stroke-width="2"/>
+      <circle cx="640" cy="120" r="7" fill="#96ad7c" stroke="#f8f6f0" stroke-width="5"/>
+      <circle cx="640" cy="380" r="7" fill="#96ad7c" stroke="#f8f6f0" stroke-width="5"/>
+
+      <g transform="translate(72 77)" filter="url(#softShadow)">
+        <rect width="495" height="208" rx="18" fill="#fffef9" stroke="#d8dfd0"/>
+        <circle cx="28" cy="31" r="3" fill="#9bb484"/>
+        <text x="39" y="35" class="sans muted tiny">爸爸记录</text>
+        <text x="28" y="78" class="sans ink" font-size="15" font-weight="600">今天的小小发现</text>
+        <text x="28" y="108" class="sans muted small">又又今天学会了和每个人说“谢谢”。</text>
+        <line x1="28" y1="132" x2="467" y2="132" stroke="#e0e6da"/>
+        <text x="28" y="162" class="sans ink" font-size="14" font-weight="600">这一天的画面</text>
+        <text x="128" y="162" class="sans muted tiny">· 3</text>
+        <rect x="28" y="176" width="84" height="84" rx="10" fill="#e6ecdf"/>
+        <rect x="120" y="176" width="84" height="84" rx="10" fill="#dce7d3"/>
+        <rect x="212" y="176" width="84" height="84" rx="10" fill="#edf0e8"/>
+      </g>
+
+      <g transform="translate(713 337)" filter="url(#softShadow)">
+        <rect width="495" height="208" rx="18" fill="#fffef9" stroke="#d8dfd0"/>
+        <circle cx="28" cy="31" r="3" fill="#c59a74"/>
+        <text x="39" y="35" class="sans muted tiny">妈妈记录</text>
+        <text x="28" y="78" class="sans ink" font-size="15" font-weight="600">散步时的笑脸</text>
+        <text x="28" y="108" class="sans muted small">傍晚的风很轻，我们一起慢慢走回家。</text>
+        <line x1="28" y1="132" x2="467" y2="132" stroke="#e0e6da"/>
+        <text x="28" y="162" class="sans ink" font-size="14" font-weight="600">这一天的画面</text>
+        <text x="128" y="162" class="sans muted tiny">· 2</text>
+        <rect x="28" y="176" width="84" height="84" rx="10" fill="#dfe9d6"/>
+        <rect x="120" y="176" width="84" height="84" rx="10" fill="#e9e5d7"/>
+      </g>
+
+      <text x="608" y="113" text-anchor="end" class="serif ink" font-size="24">14 日</text>
+      <text x="672" y="373" class="serif ink" font-size="24">13 日</text>
+    </g>
+  </g>
+</svg>

@@ -30,14 +30,21 @@ body{background-image:radial-gradient(#bcc9b21a .7px,transparent .7px);backgroun
 .heat-options .zoom-label{margin:10px 0 0}
 .journal-range{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:12px;font-size:13px;color:var(--muted)}
 .journal-range button{font-size:12px;min-height:36px;padding:5px 10px}
-.journal-feed .chapter{font-size:26px;letter-spacing:1px;margin:12px 0 20px;padding:12px}
-.journal-feed .chapter small{display:inline;font-size:12px;margin:0 10px 0 0;letter-spacing:1px}
+.journal-feed .chapter{position:sticky;top:78px;z-index:12;width:fit-content;min-width:184px;margin:12px auto 18px;padding:7px 18px;border:1px solid #d3ddcb;border-radius:99px;background:#f8f6f0ed;box-shadow:0 5px 14px #58674b12;font-size:21px;letter-spacing:1px;text-align:center;backdrop-filter:blur(10px)}
+.journal-feed .chapter small{display:inline;font-size:11px;margin:0 8px 0 0;letter-spacing:1px}
 .journal-feed .journal-empty{margin:16px auto 32px;padding:36px 24px}
 .journal-empty .empty-mark{font-size:30px}
 .journal-empty h2{margin-top:12px}
 .timeline-loader{min-height:52px;margin:24px 0;text-align:center;color:var(--muted);font-size:13px}
 .timeline-loader>p{margin:0;padding:14px 0}
 .timeline-loader .notice{margin:0}
+/* One full-width day card keeps a dense media wall from wasting either timeline column. */
+.journal-feed .timeline:before{display:none}
+.timeline-month{position:relative}
+.journal-feed .entry{display:block;margin-bottom:28px}
+.journal-feed .stamp{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 9px;padding:0 2px;background:transparent;text-align:left}
+.journal-feed .stamp:after{display:none}
+.journal-feed .stamp time{font:24px Georgia,'Songti SC',serif;color:var(--green)}
 @media(max-width:650px){
  .home-intro{align-items:flex-start;gap:14px;padding:20px 0}
  .home-title{display:block}
@@ -53,7 +60,10 @@ body{background-image:radial-gradient(#bcc9b21a .7px,transparent .7px);backgroun
  .journal-filters button{flex-shrink:0}
  .calendar-panel>.heatmap{padding:18px 14px}
  .calendar-panel .heat-controls{gap:8px}
- .journal-feed .chapter{text-align:left;font-size:24px;margin:10px 0 14px;padding:10px 0 10px 30px}
+ .journal-feed .chapter{top:112px;min-width:0;margin:8px auto 14px;padding:6px 14px;font-size:18px;text-align:center}
+ .journal-feed .entry{padding-left:0}
+ .journal-feed .entry:before{display:none}
+ .journal-feed .stamp{padding:0;margin-bottom:8px}
  .journal-feed .journal-empty{margin:8px auto 24px;padding:28px 20px}
  .journal-range{align-items:flex-start;flex-wrap:wrap}
 }
@@ -84,13 +94,13 @@ html { scrollbar-gutter: stable; }
 .dialog-saved { position: fixed; right: 20px; bottom: 20px; z-index: 10; max-width: calc(100vw - 40px); margin: 0; padding: 12px 18px; box-shadow: 0 4px 24px #22301f20; }
 
 /* One quiet, sticky header; filters appear only when requested. */
-.topbar { position: sticky; top: 0; z-index: 20; min-height: 76px; padding: 12px 0; gap: 20px; background: var(--bg); box-shadow: 0 -20px 0 20px var(--bg); }
-.brand-group { display: flex; align-items: center; gap: 18px; min-width: 0; }
+.topbar { position: sticky; top: 0; z-index: 20; min-height: 78px; padding: 10px 0; gap: 18px; background: var(--bg); box-shadow: 0 -20px 0 20px var(--bg); }
+.brand-group { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .brand-group .brand { white-space: nowrap; }
-.header-age { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.brand{font-size:28px}
 .header-actions { display: flex; gap: 10px; margin-left: auto; }
-.header-actions button { font-size: 13px; white-space: nowrap; }
-.topbar nav { flex-shrink: 0; font-size: 13px; gap: 12px; }
+.header-actions button { min-height:38px;font-size:14px; white-space: nowrap; }
+.topbar nav { flex-shrink: 0; font-size:14px; gap:12px; }
 .topbar nav:only-of-type { margin-left: auto; }
 .header-actions + nav { margin-left: 0 !important; }
 .filter-toggle[aria-expanded=true] { background: var(--soft); }
@@ -101,7 +111,6 @@ html { scrollbar-gutter: stable; }
 @media(max-width:650px) {
  .topbar { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px 12px; padding: 10px 0; }
  .brand-group { gap: 10px; flex-wrap: wrap; }
- .header-age { font-size: 11px; }
  .topbar nav { grid-column: 2; grid-row: 1; gap: 8px; }
  .topbar nav button { font-size: 12px; min-height: 36px; padding: 5px 10px; }
  .header-actions { grid-column: 1 / -1; grid-row: 2; margin: 0; justify-content: flex-end; }
@@ -127,7 +136,8 @@ html { scrollbar-gutter: stable; }
 .upload-selection-status{color:#a45137!important;font-weight:600}
 
 /* Media previews are distinct from background processing. */
-.media-processing{color:var(--green)}.media-load-error{position:absolute;left:8px;right:8px;top:8px;padding:5px 8px;background:var(--surface);border-radius:8px;font-size:12px}.media-item.compact .media-placeholder{height:100%}.media-item.compact .video-badge{max-width:calc(100% - 20px);font-size:11px}
+.media-processing{color:var(--green)}.media-item.compact .media-placeholder{height:100%;color:#697565}.media-item.compact .media-placeholder p{margin:0;font-size:10px}.media-item.compact .video-badge{max-width:calc(100% - 20px);font-size:11px}
+.media-item.compact .default-cover{position:relative;isolation:isolate;overflow:hidden}.media-item.compact .default-cover:before{content:'';position:absolute;inset:10%;border:1px solid #ffffff8c;border-radius:8px;z-index:-1}.media-item.compact .default-cover:after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,#ffffff20,transparent 56%);z-index:-1}.media-item.compact .default-cover[data-cover=dawn]{background:radial-gradient(circle at 72% 23%,#fff7c9 0 10%,transparent 25%),linear-gradient(145deg,#f0ddba,#dce8cf)}.media-item.compact .default-cover[data-cover=moss]{background:radial-gradient(ellipse at 22% 80%,#b9cf9b 0 18%,transparent 42%),linear-gradient(145deg,#dce8d0,#9db78a)}.media-item.compact .default-cover[data-cover=paper]{background:linear-gradient(135deg,#f4eddc 0 38%,#e6dac0 38% 42%,#eef1e5 42% 100%)}.media-item.compact .default-cover[data-cover=film]{background:radial-gradient(circle at 76% 28%,#d9e3c7 0 9%,transparent 23%),linear-gradient(145deg,#81958a,#c7d2bd)}
 .video-surface{position:relative}.video-cover-play{position:absolute;inset:0;width:100%;height:100%;padding:0;border:0;border-radius:0;background:transparent;color:#fff;flex-direction:column;gap:12px}.video-cover-play:disabled{opacity:1;cursor:wait}.video-cover-play:focus-visible{outline-offset:-5px}.video-play-icon{display:flex;align-items:center;justify-content:center;width:68px;height:68px;border-radius:50%;background:#243221b8;border:2px solid #ffffffd9;box-shadow:0 3px 16px #0003}.video-cover-play:hover .video-play-icon,.video-cover-play:focus-visible .video-play-icon{background:#344334ed}.video-play-status{padding:3px 12px;border-radius:99px;background:#243221cf;font-size:13px}.video-play-loading{font-size:30px;line-height:1;letter-spacing:3px}
 
 .upload-details{margin-top:4px;border-top:1px solid var(--line)}
@@ -192,3 +202,33 @@ html { scrollbar-gutter: stable; }
 .account-menu{position:relative}.account-menu>summary{list-style:none;cursor:pointer}.account-menu>summary::-webkit-details-marker{display:none}.account-chevron{font-size:15px;line-height:1;color:var(--green);transition:transform .15s}.account-menu[open] .account-chevron{transform:rotate(180deg)}.account-popover{position:absolute;right:0;top:calc(100% + 9px);z-index:30;width:210px;padding:14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 30px #34433418}.account-popover small,.account-popover strong{display:block}.account-popover small{font-size:11px;color:var(--muted);margin-bottom:3px}.account-popover>strong{font-size:14px;margin-bottom:11px}.account-popover>a{display:flex;justify-content:space-between;align-items:center;padding:10px 11px;border-radius:9px;background:var(--soft);text-decoration:none;font-size:13px;font-weight:600}.account-popover>a span{font-size:19px;line-height:1}.backup-page{max-width:900px;margin:0 auto;padding:30px 0 10px}.backup-back{display:inline-block;font-size:13px;color:var(--muted);text-decoration:none}.backup-heading{display:flex;justify-content:space-between;align-items:end;gap:18px;padding:30px 0 24px}.backup-heading h1{font:34px Georgia,'Songti SC',serif;margin:8px 0}.backup-heading p:not(.eyebrow){margin:0;color:var(--muted)}.backup-admin{padding:6px 11px;border-radius:99px;background:var(--soft);font-size:11px;color:var(--green);white-space:nowrap}.backup-scope{display:flex;align-items:center;gap:12px;padding:15px 18px;border-radius:13px;background:#efeee5;font-size:13px;color:var(--muted);flex-wrap:wrap}.backup-scope strong{color:var(--ink);font-weight:600}.backup-info-icon{display:grid;place-items:center;width:20px;height:20px;border:1px solid #96a589;border-radius:50%;font:600 13px Georgia;color:#7c8b70}.backup-action{display:flex;align-items:center;gap:18px;margin-top:22px;padding:22px 24px;background:linear-gradient(110deg,#f0f4e9,#e5edda);border-color:#d7e2ca}.backup-action-icon{display:grid;place-items:center;width:52px;height:52px;border-radius:15px;background:#fff8;color:#678558;font-size:28px}.backup-action h2{font:22px Georgia,'Songti SC',serif;margin:0 0 4px}.backup-action p,.backup-action small{display:block;margin:0;color:var(--muted);font-size:13px}.backup-action small{font-size:11px;margin-top:4px}.backup-action button{margin-left:auto;min-width:130px;font-size:13px}.backup-history{margin-top:34px}.backup-history-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.backup-history-title h2{font:22px Georgia,'Songti SC',serif;margin:0}.backup-history-title span{font-size:12px;color:var(--muted)}.backup-record{margin:12px 0;padding:22px 24px}.backup-record-header{display:flex;justify-content:space-between;align-items:start;gap:14px}.backup-record-header h3{font-size:16px;margin:0 0 4px}.backup-status{font-size:11px;color:var(--muted)}.backup-status.completed{color:#6d8b54}.backup-status.failed{color:#984429}.backup-count{font-size:12px;color:var(--muted)}.backup-progress{margin-top:18px}.backup-progress-label{display:flex;justify-content:space-between;font-size:13px}.backup-progress-label strong{color:var(--green)}.backup-progress progress{width:100%;height:8px;margin:8px 0;accent-color:#8daa71}.backup-progress small{font-size:11px;color:var(--muted)}.backup-downloads{display:grid;grid-template-columns:1fr 1fr;gap:12px;border-top:1px solid var(--line);margin-top:16px;padding-top:16px}.backup-downloads>div{display:grid;grid-template-columns:1fr auto;gap:3px 10px;align-items:center;padding:14px;background:#f8f9f3;border-radius:11px}.backup-downloads strong,.backup-downloads small{grid-column:1}.backup-downloads strong{font-size:14px}.backup-downloads small{font-size:11px;color:var(--muted)}.backup-downloads .button{grid-column:2;grid-row:1 / span 2;min-height:36px;font-size:12px;padding:6px 12px}.backup-error{padding:11px 13px;border-radius:9px;background:#fff4ed;color:#984429;font-size:13px}.backup-empty{text-align:center;margin-top:20px}.backup-empty h2{margin:8px 0}.backup-empty p:last-child,.backup-footnote{font-size:12px;color:var(--muted)}.backup-footnote{margin:18px 0 0}@media(max-width:650px){.account-popover{right:-5px}.account-chevron{display:none}.backup-page{padding-top:22px}.backup-heading{align-items:start;padding:24px 0 18px}.backup-heading h1{font-size:29px}.backup-action{align-items:flex-start;flex-wrap:wrap;padding:18px}.backup-action>div:nth-child(2){flex:1;min-width:210px}.backup-action button{width:100%;margin:2px 0 0}.backup-downloads{grid-template-columns:1fr}.backup-record{padding:18px}.backup-count{font-size:11px}.backup-scope{align-items:flex-start}.backup-scope strong{flex-basis:100%;padding-left:32px}}
 @media(max-width:650px){.topbar{gap:8px 10px}.header-actions button,.header-actions>.button,.topbar nav button{min-height:44px}.member-badge{gap:6px;padding-right:8px}}
 .upload-drafts{border:1px solid var(--line);border-radius:12px;padding:14px;margin:16px 0;background:var(--soft)}.upload-drafts h2{font-size:16px;margin:0 0 8px}.upload-drafts p,.upload-drafts small{font-size:12px}.upload-drafts ul,.upload-duplicates ul{list-style:none;padding:0;max-height:280px;overflow:auto}.upload-drafts li{padding:10px 0;border-top:1px solid var(--line)}.upload-drafts strong,.upload-drafts small{display:block}.upload-drafts li>div{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.upload-drafts button{font-size:12px;min-height:40px;padding:6px 10px}.upload-duplicates{font-size:12px;color:var(--green)}
+
+/* Timeline refinement: let the navigation lead, and keep the active month in view. */
+.topbar{min-height:78px;padding:10px 0;gap:18px}.brand-group{gap:14px}.brand{font-size:28px}.header-actions button,.header-actions>.button{min-height:38px;padding:6px 13px;font-size:14px}.topbar nav{font-size:14px}
+@media(max-width:650px){.topbar{min-height:104px}.brand{font-size:24px}.header-actions button,.header-actions>.button{min-height:40px;font-size:13px}.journal-feed .chapter{top:112px}}
+
+/* The age is a small lower-right note to the brand, not a second header title. */
+.brand-group{align-items:flex-end;gap:7px}.brand-context{display:inline-flex;align-items:baseline;gap:4px;align-self:flex-end;padding-bottom:4px;color:#71836a;font-size:12px;font-weight:600;line-height:1;letter-spacing:.03em;white-space:nowrap}.brand-context>strong{font:600 14px/1 Georgia,'Songti SC',serif;color:#58714f;font-variant-numeric:tabular-nums}
+@media(max-width:650px){.brand-group{gap:5px}.brand-context{padding-bottom:3px;font-size:10px}.brand-context>strong{font-size:12px}}
+
+/* One continuous hand-journal column: the page never alternates into empty halves. */
+.journal-feed .timeline{max-width:760px;margin:0 auto}
+.journal-feed .timeline:before{display:none}
+.journal-feed .entry{display:block;padding:0;margin-bottom:28px}
+.journal-feed .entry.right .memory{grid-column:auto}
+.journal-feed .stamp{display:flex;align-items:center;justify-content:flex-start;gap:10px;flex-wrap:wrap;margin:0 0 9px;padding:0;text-align:left;background:transparent}
+.journal-feed .stamp:after{display:none}
+
+/* On compact screens, retain a small chronological guide without making a second column. */
+@media(max-width:1023px){
+ .journal-feed .timeline:before{display:block;left:8px}
+ .journal-feed .entry{display:block;padding-left:30px;margin-bottom:24px}
+ .journal-feed .entry:before{display:block;content:'';position:absolute;left:3px;top:7px;width:12px;height:12px;border-radius:50%;background:var(--green)}
+ .journal-filters{flex-wrap:wrap;justify-content:flex-start}
+ .journal-filters select{flex:1 1 150px}
+}
+
+/* Sticky month marker: a clear signpost for the records currently in view. */
+.journal-feed .chapter{position:sticky;top:90px;z-index:12;display:flex;flex-direction:column;align-items:center;justify-content:center;width:218px;min-width:218px;margin:14px auto 22px;padding:9px 20px 10px;border:1px solid #b9c9ad;border-radius:16px;background:#eff4e9f2;box-shadow:0 7px 18px #40573522;color:#3f5d39;font:600 27px/1.05 Georgia,'Songti SC',serif;letter-spacing:.04em;text-align:center;backdrop-filter:blur(12px)}
+.journal-feed .chapter small{display:block;margin:0 0 4px;color:#71836a;font:600 11px/1.1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.14em}
+@media(max-width:650px){.journal-feed .chapter{top:114px;width:176px;min-width:176px;margin:10px auto 16px;padding:8px 14px 9px;border-radius:14px;font-size:23px}.journal-feed .chapter small{margin-bottom:3px;font-size:10px}}
