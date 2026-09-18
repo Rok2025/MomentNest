@@ -43,10 +43,10 @@ export function PhoneAuthForm({bind=false,onSuccess,expectedMemberId}:{bind?:boo
  if(done)return <p role="status">{message}</p>;
  return <form className="form-stack" action={verify} aria-busy={busy}>
   <fieldset disabled={busy}>
-   <label htmlFor={`${id}-phone`}>手机号<input id={`${id}-phone`} type="tel" autoComplete="tel" inputMode="tel" required value={phone} placeholder="中国大陆手机号" onChange={event=>{setPhone(event.target.value);setSentPhone('');setCode('');setMessage('');}}/></label>
-   <button type="button" disabled={busy||seconds>0||!phoneSchema.safeParse(phone).success} onClick={()=>void send()}>{seconds>0?`${seconds} 秒后重发`:'获取验证码'}</button>
+   <div className="phone-code-request"><label htmlFor={`${id}-phone`}>手机号<input id={`${id}-phone`} type="tel" autoComplete="tel" inputMode="tel" required value={phone} placeholder="手机号码" onChange={event=>{setPhone(event.target.value);setSentPhone('');setCode('');setMessage('');}}/></label>
+   <button className="code-request" type="button" disabled={busy||seconds>0||!phoneSchema.safeParse(phone).success} onClick={()=>void send()}>{seconds>0?`${seconds} 秒后重发`:'获取验证码'}</button></div>
    <label htmlFor={`${id}-code`}>验证码<input id={`${id}-code`} inputMode="numeric" autoComplete="one-time-code" required pattern="[0-9]{6}" maxLength={6} value={code} onChange={event=>setCode(event.target.value.replace(/\D/g,''))} placeholder="6 位短信验证码"/></label>
-   <button className="primary" disabled={busy||sentPhone!==phone||!sentPhone||code.length!==6}>{busy?'正在处理…':bind?'确认绑定':'登录'}</button>
+   <button className="primary login-submit" disabled={busy||sentPhone!==phone||!sentPhone||code.length!==6}>{busy?'正在处理…':bind?'确认绑定':'登录'}</button>
   </fieldset>
   <p role="status" aria-live="polite">{message}</p>
   {refreshRequired&&<button type="button" onClick={()=>window.location.reload()}>刷新页面</button>}

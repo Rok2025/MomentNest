@@ -11,7 +11,7 @@ export function AuthForm({mode='login',onSuccess,expectedMemberId}:{mode?:'login
   const [emailLogin,setEmailLogin]=useState(false);
   if(mode==='reset')return <EmailAuthForm mode="reset"/>;
   return <>{emailLogin?<EmailAuthForm onSuccess={onSuccess} expectedMemberId={expectedMemberId}/>:<PhoneAuthForm onSuccess={onSuccess} expectedMemberId={expectedMemberId}/>}
-    <button type="button" onClick={()=>setEmailLogin(value=>!value)}>{emailLogin?'使用短信验证码登录':'使用邮箱密码登录'}</button></>;
+    <button className="auth-method-switch" type="button" onClick={()=>setEmailLogin(value=>!value)}>{emailLogin?'改用短信验证码登录':'改用邮箱密码登录'}</button></>;
 }
 function EmailAuthForm({mode='login',onSuccess,expectedMemberId}:{mode?:'login'|'reset';onSuccess?:()=>void;expectedMemberId?:string}){
   const router=useRouter();
@@ -32,7 +32,7 @@ function EmailAuthForm({mode='login',onSuccess,expectedMemberId}:{mode?:'login'|
     {mode!=='reset'&&<label>邮箱<input required name="email" type="email" autoComplete="email" inputMode="email" value={email} onChange={event=>setEmail(event.target.value)}/></label>}
     <label>{mode==='reset'?'新密码':'密码'}<input required name="password" type="password" minLength={mode==='reset'?12:1} maxLength={128} autoComplete={mode==='reset'?'new-password':'current-password'}/></label>
     {mode==='reset'&&<label>再次输入新密码<input required name="confirm" type="password" minLength={12} autoComplete="new-password"/></label>}
-    <button disabled={pending} className="primary">{pending?(mode==='login'?'正在登录…':'正在更新…'):mode==='login'?'登录':'更新密码'}</button>
+    <button disabled={pending} className="primary login-submit">{pending?(mode==='login'?'正在登录…':'正在更新…'):mode==='login'?'登录':'更新密码'}</button>
     </fieldset>
     <p aria-live="polite" role={pending||state.ok?'status':'alert'}>{pending?(mode==='login'?'正在验证账号并进入，请稍候…':'正在更新密码，请稍候…'):state.message}</p>
     {mode==='login'?<Link href="/forgot-password" target={onSuccess?'_blank':undefined}>忘记密码</Link>:<Link href="/login">回到登录</Link>}
