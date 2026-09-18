@@ -24,7 +24,9 @@ describe('phone auth route',()=>{
   const response=await POST(request({operation:'verify',phone:'13800138000',code:'123456',bind:false}));
   expect(await response.json()).toEqual({ok:true,message:'登录成功'});
   expect(response.headers.get('set-cookie')).toContain('sb-session=updated');
-  expect(mocked.verify).toHaveBeenCalledWith({operation:'verify',phone:'13800138000',code:'123456',bind:false},expect.any(Function));
+  expect(response.headers.get('x-request-id')).toMatch(/^[a-zA-Z0-9_-]{8,80}$/);
+  expect(mocked.createServerClient).toHaveBeenCalledWith('https://example.supabase.co','publishable-key',expect.objectContaining({global:{fetch:expect.any(Function)}}));
+  expect(mocked.verify).toHaveBeenCalledWith({operation:'verify',phone:'13800138000',code:'123456',bind:false},expect.any(Function),expect.any(String));
  });
  it('rejects cross-origin calls before they reach Supabase',async()=>{
   const response=await POST(request({operation:'send',phone:'13800138000',bind:false},'https://attacker.invalid'));

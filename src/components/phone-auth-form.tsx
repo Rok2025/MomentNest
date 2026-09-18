@@ -7,7 +7,8 @@ import type { AuthResult } from '@/domain/events';
 
 type PhoneRequest={operation:'send';phone:string;bind:boolean}|{operation:'verify';phone:string;code:string;bind:boolean;expectedMemberId?:string};
 async function phoneRequest(input:PhoneRequest):Promise<AuthResult>{
- const response=await fetch('/api/auth/phone',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',credentials:'same-origin',body:JSON.stringify(input)});
+ const response=await fetch('/api/auth/phone',{method:'POST',headers:{'Content-Type':'application/json','X-Request-ID':crypto.randomUUID()},cache:'no-store',credentials:'same-origin',body:JSON.stringify(input)});
+ if(!response.headers.get('content-type')?.includes('application/json'))throw Error('PHONE_AUTH_RESPONSE_INVALID');
  const result:unknown=await response.json();
  if(!result||typeof result!=='object'||typeof (result as AuthResult).ok!=='boolean'||typeof (result as AuthResult).message!=='string')throw Error('PHONE_AUTH_RESPONSE_INVALID');
  return result as AuthResult;
@@ -29,7 +30,7 @@ export function PhoneAuthForm({bind=false,onSuccess,expectedMemberId}:{bind?:boo
   try{
    const result=await phoneRequest({operation:'send',phone,bind});setMessage(result.message);
    if(result.ok){setSentPhone(phone);setCode('');setSeconds(60);setDeadline(Date.now()+60000);}
-  }catch{setMessage('网络暂时不可用，请刷新页面后重试');setRefreshRequired(true);}finally{setBusy(false);}
+  }catch{setMessage('登录请求未完成。请不要重复获取验证码；如已收到短信，可先输入最近收到的一组验证码。');setRefreshRequired(true);}finally{setBusy(false);}
  }
  async function verify(){
   setBusy(true);setMessage('');setRefreshRequired(false);
@@ -37,7 +38,7 @@ export function PhoneAuthForm({bind=false,onSuccess,expectedMemberId}:{bind?:boo
    const result=await phoneRequest({operation:'verify',phone,code,bind,expectedMemberId});
    setMessage(result.message);
    if(result.ok){setDone(true);if(onSuccess)onSuccess();else if(!bind){router.replace('/');router.refresh();}}
-  }catch{setMessage('网络暂时不可用，请刷新页面后重试');setRefreshRequired(true);}finally{setBusy(false);}
+  }catch{setMessage('登录请求未完成。请不要重复获取验证码；如已收到短信，可先输入最近收到的一组验证码。');setRefreshRequired(true);}finally{setBusy(false);}
  }
  if(done)return <p role="status">{message}</p>;
  return <form className="form-stack" action={verify} aria-busy={busy}>
