@@ -1,6 +1,7 @@
 import { beforeEach,describe,expect,it,vi } from 'vitest';
 
 const mocked=vi.hoisted(()=>({getUser:vi.fn(),updateUser:vi.fn(),signInWithOtp:vi.fn(),verifyOtp:vi.fn(),signOut:vi.fn(),memberFor:vi.fn()}));
+vi.mock('server-only',()=>({}));
 vi.mock('../src/server/auth/client',()=>({authClient:async()=>({auth:mocked})}));
 vi.mock('../src/server/db',()=>({database:()=>({})}));
 vi.mock('../src/server/event-store',()=>({memberFor:mocked.memberFor}));

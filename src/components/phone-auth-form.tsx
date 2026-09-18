@@ -1,14 +1,23 @@
 'use client';
 
 import { useEffect,useId,useState } from 'react';
-import { sendPhoneCode,verifyPhoneCode } from '@/app/actions/phone';
 import { useRouter } from 'next/navigation';
 import { phoneSchema } from '@/domain/phone';
+import type { AuthResult } from '@/domain/events';
+
+type PhoneRequest={operation:'send';phone:string;bind:boolean}|{operation:'verify';phone:string;code:string;bind:boolean;expectedMemberId?:string};
+async function phoneRequest(input:PhoneRequest):Promise<AuthResult>{
+ const response=await fetch('/api/auth/phone',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',credentials:'same-origin',body:JSON.stringify(input)});
+ const result:unknown=await response.json();
+ if(!result||typeof result!=='object'||typeof (result as AuthResult).ok!=='boolean'||typeof (result as AuthResult).message!=='string')throw Error('PHONE_AUTH_RESPONSE_INVALID');
+ return result as AuthResult;
+}
 
 export function PhoneAuthForm({bind=false,onSuccess,expectedMemberId}:{bind?:boolean;onSuccess?:()=>void;expectedMemberId?:string}){
  const id=useId(),router=useRouter();
  const [phone,setPhone]=useState(''),[code,setCode]=useState(''),[sentPhone,setSentPhone]=useState('');
  const [busy,setBusy]=useState(false),[done,setDone]=useState(false),[message,setMessage]=useState('');
+ const [refreshRequired,setRefreshRequired]=useState(false);
  const [deadline,setDeadline]=useState(0),[seconds,setSeconds]=useState(0);
  useEffect(()=>{
   if(!deadline)return;
@@ -16,19 +25,19 @@ export function PhoneAuthForm({bind=false,onSuccess,expectedMemberId}:{bind?:boo
   tick();const timer=setInterval(tick,1000);return()=>clearInterval(timer);
  },[deadline]);
  async function send(){
-  setBusy(true);setMessage('');
+  setBusy(true);setMessage('');setRefreshRequired(false);
   try{
-   const result=await sendPhoneCode({phone,bind});setMessage(result.message);
+   const result=await phoneRequest({operation:'send',phone,bind});setMessage(result.message);
    if(result.ok){setSentPhone(phone);setCode('');setSeconds(60);setDeadline(Date.now()+60000);}
-  }catch{setMessage('暂时无法发送验证码，请稍后重试');}finally{setBusy(false);}
+  }catch{setMessage('网络暂时不可用，请刷新页面后重试');setRefreshRequired(true);}finally{setBusy(false);}
  }
  async function verify(){
-  setBusy(true);setMessage('');
+  setBusy(true);setMessage('');setRefreshRequired(false);
   try{
-   const result=await verifyPhoneCode({phone,code,bind,expectedMemberId});
+   const result=await phoneRequest({operation:'verify',phone,code,bind,expectedMemberId});
    setMessage(result.message);
    if(result.ok){setDone(true);if(onSuccess)onSuccess();else if(!bind){router.replace('/');router.refresh();}}
-  }catch{setMessage('暂时无法验证，请稍后重试');}finally{setBusy(false);}
+  }catch{setMessage('网络暂时不可用，请刷新页面后重试');setRefreshRequired(true);}finally{setBusy(false);}
  }
  if(done)return <p role="status">{message}</p>;
  return <form className="form-stack" action={verify} aria-busy={busy}>
@@ -39,5 +48,6 @@ export function PhoneAuthForm({bind=false,onSuccess,expectedMemberId}:{bind?:boo
    <button className="primary" disabled={busy||sentPhone!==phone||!sentPhone||code.length!==6}>{busy?'正在处理…':bind?'确认绑定':'登录'}</button>
   </fieldset>
   <p role="status" aria-live="polite">{message}</p>
+  {refreshRequired&&<button type="button" onClick={()=>window.location.reload()}>刷新页面</button>}
  </form>;
 }
