@@ -15,6 +15,7 @@ work/
 # Local operational notes include account contacts and machine-specific state.
 docs/*
 !docs/public-setup.md
+!docs/phone-login.md
 prototypes/
 .DS_Store
 *.log

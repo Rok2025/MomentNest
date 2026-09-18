@@ -5,8 +5,15 @@ import { useRouter } from 'next/navigation';
 import { loginAction,resetAction } from '@/app/actions/auth';
 import { loginPageAction } from '@/app/actions/login';
 import type { AuthResult } from '@/domain/events';
+import { PhoneAuthForm } from './phone-auth-form';
 const initial:AuthResult={ok:false,message:''};
 export function AuthForm({mode='login',onSuccess,expectedMemberId}:{mode?:'login'|'reset';onSuccess?:()=>void;expectedMemberId?:string}){
+  const [emailLogin,setEmailLogin]=useState(false);
+  if(mode==='reset')return <EmailAuthForm mode="reset"/>;
+  return <>{emailLogin?<EmailAuthForm onSuccess={onSuccess} expectedMemberId={expectedMemberId}/>:<PhoneAuthForm onSuccess={onSuccess} expectedMemberId={expectedMemberId}/>}
+    <button type="button" onClick={()=>setEmailLogin(value=>!value)}>{emailLogin?'使用短信验证码登录':'使用邮箱密码登录'}</button></>;
+}
+function EmailAuthForm({mode='login',onSuccess,expectedMemberId}:{mode?:'login'|'reset';onSuccess?:()=>void;expectedMemberId?:string}){
   const router=useRouter();
   const [email,setEmail]=useState('');
   const action=mode==='login'?(onSuccess?loginAction:loginPageAction):resetAction;
